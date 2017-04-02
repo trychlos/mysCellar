@@ -1,0 +1,102 @@
+CAVE
+====
+  CAV-01: détection inondation
+  CAV-02: mesure température
+  CAV-03: mesure hygrométrie
+  CAV-04: détection présence (ouverture de porte)
+
+CAV-01 - Détection inondation
+-----------------------------
+
+  Composants:
+  - Foliar rain sensor module sensitive sensor module (AliExpress USD 0.91)
+  - Arduino Nano (AliExpress EUR 2.91 x 5)
+
+    [1] The rain sensor detects water that completes the circuits on
+        its sensor boards' printed leads. The sensor board acts as a
+        variable resistor that will change from 100k ohms when wet to
+        2M ohms when dry. In short, the wetter the board the more
+        current that will be conducted.
+    [2] Connect the 5V power supply , power indicator light , sensor 
+        board does not drop when , DO output is high , the switch lights
+        off , dripping a drop of water , DO output is low , the switch
+        indicator light,
+
+    Nano output:
+    - VCC 5v to sensor
+    - GND
+
+    Nano input
+    - logical D0 (from HIGH=dry to LOW=wet) -> D4 [D4]
+    - analog A0 (from 1023=dry to 0=soak)   -> ADC7 (analog only) [A7]
+
+[1] http://www.instructables.com/id/Arduino-Modules-Rain-Sensor/
+[2] http://www.aliexpress.com/snapshot/6826183159...
+    http://www.aliexpress.com/item/Free-Shipping-2sets-Foliar-rain-sensor-module-sensitive-sensor-module/1801852999.html
+
+CAV-02 - Mesure température
+CAV-03 - Mesure hygrométrie
+---------------------------
+
+  Composants:
+  - DHT22 Digital For Arduino AM2302 Temperature and Humidity Sensor Module (AliExpress USD 4.48)
+    One-Wire: single serial bi-directional
+
+    Nano output:
+    - VCC 5v to sensor
+    - GND
+
+    Nano input
+    - one-wire single serial
+
+[1] http://www.aliexpress.com/snapshot/6826183160.html
+    http://fr.aliexpress.com/item/Free-Shipping-DHT22-Digital-For-Arduino-AM2302-Temperature-and-Humidity-Sensor-Module/32292804849.html
+[2] http://www.electroschematics.com/11291/arduino-dht22-am2302-tutorial-library/
+
+I2C Logic Level Converter Bi-Directional Module 5V to 3.3V For Arduino (AliExpress USD 1.22)
+
+NRF24L01+ Wireless Module 2.4G Wireless Communication Module (AliExpress USD 0.67 x 10)
+http://www.aliexpress.com/snapshot/6830181791.html
+
+W5100 Ethernet module Ethernet network module for arduino (AliExpress USD 6.65)
+http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-network-module-for-arduino/2027367160.html
+
+CAV-04 - Ouverture de porte
+---------------------------
+The sensor is provided by the Telemecanique door switch.
+This is a double-relais platine, with a NO and a NC contacts.
+The NC contact is used by origin for lights.
+We are using here the NO contact for the door opening detector:
+- door closed : contact is closed
+- door opened: contact is opened.
+
+A 10k resistor is connected to get the opening detection.
+
+CAVE - Arduino pins
+-------------------
+
+  D1/TX:
+  D0/RX:
+  RST:
+  GND:
+  A0:               door opening detection
+  D2/INT0:          radio module IRQ
+  D3:       (input) temp-hygro sensor SDA output
+  D4:       (input) rain sensor digital output
+  D9:               radio module CE
+  D10/CSN:          radio module CSN
+  D11/MOSI:         radio module MOSI
+  D12/MISO:         radio module MISO
+  D13/SCK:          radio module SCK
+  3.3V:             radio module VCC
+  A7:       (input) rain sensor analog output
+  5V:               rain sensor VCC
+                   +temp-hygro sensor VCC
+  GND:              rain sensor GND
+                   +temp-hygro sensor GND
+                   +radio module GND
+                   +door opening detection GND
+                   +alimentation GND
+  VIN:       alimentation +5v
+
+
