@@ -1,12 +1,35 @@
-CAVE
-====
-  CAV-01: détection inondation
-  CAV-02: mesure température
-  CAV-03: mesure hygrométrie
-  CAV-04: détection présence (ouverture de porte)
+ mysCellar - README
 
-CAV-01 - Détection inondation
------------------------------
+ Summary
+ =======
+ 
+   Description
+   CAV-01 - Flooding detection
+   CAV-02 - Temperature measure
+   CAV-03 - Humidity measure
+   CAV-04 - Door opening
+   Arduino pins
+   Interactions
+
+-----------------------------------------------------------------------
+ Description
+ ===========
+
+ The mysCellar sensor is an Arduino Nano-based MySensors v 2.1x sensor.
+
+ It sends to the controller:
+ - the current temperature
+ - the current humidity rate
+ - an alert when the door is opened or closed
+ - an alert when the cellar is flooded.
+
+ Current temperature and humidity rate are sent on a configurable period.
+ Door and flooding alerts are sent as soon as they are detected.
+ Door and flooding status are re-sent on a configurable period.
+
+-----------------------------------------------------------------------
+ CAV-01 - Flooding detection
+ ===========================
 
   Composants:
   - Foliar rain sensor module sensitive sensor module (AliExpress USD 0.91)
@@ -34,9 +57,10 @@ CAV-01 - Détection inondation
 [2] http://www.aliexpress.com/snapshot/6826183159...
     http://www.aliexpress.com/item/Free-Shipping-2sets-Foliar-rain-sensor-module-sensitive-sensor-module/1801852999.html
 
-CAV-02 - Mesure température
-CAV-03 - Mesure hygrométrie
----------------------------
+-----------------------------------------------------------------------
+ CAV-02 - Temperature measure
+ CAV-03 - Humidity measure
+ ============================
 
   Composants:
   - DHT22 Digital For Arduino AM2302 Temperature and Humidity Sensor Module (AliExpress USD 4.48)
@@ -61,19 +85,22 @@ http://www.aliexpress.com/snapshot/6830181791.html
 W5100 Ethernet module Ethernet network module for arduino (AliExpress USD 6.65)
 http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-network-module-for-arduino/2027367160.html
 
-CAV-04 - Ouverture de porte
----------------------------
-The sensor is provided by the Telemecanique door switch.
-This is a double-relais platine, with a NO and a NC contacts.
-The NC contact is used by origin for lights.
-We are using here the NO contact for the door opening detector:
-- door closed : contact is closed
-- door opened: contact is opened.
+-----------------------------------------------------------------------
+ CAV-04 - Door opening
+ =====================
 
-A 10k resistor is connected to get the opening detection.
+ The sensor is provided by the Telemecanique door switch.
+ This is a double-relais platine, with a NO and a NC contacts.
+ The NC contact is used by origin for lights.
+ We are using here the NO contact for the door opening detector:
+ - door closed : contact is closed
+ - door opened: contact is opened.
 
-CAVE - Arduino pins
--------------------
+ A 10k resistor is connected to get the opening detection.
+
+-----------------------------------------------------------------------
+ Arduino pins
+ ============
 
   D1/TX:
   D0/RX:
@@ -99,4 +126,61 @@ CAVE - Arduino pins
                    +alimentation GND
   VIN:       alimentation +5v
 
+-----------------------------------------------------------------------
+ Interactions
+ ============
+
+ The MySensors node present one main ID to the controller, to manage global
+ actions and request or set global parameters.
+
+ Each sensor presents its own ID.
+
+ Below interactions are seen from MySensors node point of view.
+
+ - CHILD_MAIN (S_CUSTOM)
+   Present the node to the controller, and let us manage global actions.
+    |
+    +- Received from controller
+    |   |
+    |   +- C_SET
+    |   |   |
+    |   |   +- V_CUSTOM with payload = '1=<value>': set the measures max frequency (default is 1mn - ms).
+    |   |   +- V_CUSTOM with payload = '2=<value>': set the unchanged timeout (default is 1h - ms).
+    |   |
+    |   +- C_REQ
+    |       |
+    |       +- V_CUSTOM with payload = '1': request a configuration dump
+    |                                       send the configuration parameters along with the value of the sensors
+    |
+    +- Sent to controller
+        |
+        +- V_VAR1: measures max frequency (ms)
+        +- V_VAR2: unchanged timeout (ms)
+
+ - CHILD_FLOOD (S_WATER_LEAK)
+    |
+    +- Sent to controller
+        |
+        +- V_TRIPPED: whether a flooding is detected
+
+ - CHILD_TEMPERATURE (S_TEMP)
+    |
+    +- Sent to controller
+        |
+        +- V_TEMP: temperature (°C)
+
+ - CHILD_HUMIDITY (S_HUM)
+    |
+    +- Sent to controller
+        |
+        +- V_HUM: humidity (%)
+
+ - CHILD_OPENING (S_DOOR)
+    |
+    +- Sent to controller
+        |
+        +- V_TRIPPED: whether the door is opened (or closed)
+
+-----------------------------------------------------------------------
+ P. Wieser - Created on 2017, may 2nd.
 
