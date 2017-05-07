@@ -3,10 +3,6 @@
 
 #include <Arduino.h>
 
-// max count of allocatable pwiTimer's
-// the array is statically allocated as a global static variable in .cpp file
-#define PWITIMER_MAX 15
-
 /*
  * This is a very simple timer which let us trigger a function at the end
  * of a predefined delay.
@@ -60,7 +56,7 @@ class pwiTimer {
         pwiTimerCb    cb;
         void         *user_data;
         unsigned long start_ms;
-        char         *label;
+        const char   *label;
         bool          debug;
 
         void          objDump( uint8_t idx );

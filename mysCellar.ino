@@ -43,31 +43,24 @@
 #define DEBUG_ENABLED
 
 static const char * const thisSketchName    = "mysCellar";
-static const char * const thisSketchVersion = "5.0.2017";
+static const char * const thisSketchVersion = "5.1.2017";
 
 /* 
  * Declare the timers
  */
 #include "pwi_timer.h"
 
+static unsigned long st_main_timeout = 250;
 pwiTimer main_timer;
 
-pwiTimer max_frequency_timer;
-static const char   *st_max_frequency_label   = "MaxFrequencyTimer";
 static unsigned long st_max_frequency_timeout = 60000;       // 1 mn
+pwiTimer max_frequency_timer;
 
-pwiTimer flood_unchanged_timer;
-static const char    *st_flood_unchanged_label  = "FloodUnchangedTimer";
 static unsigned long st_unchanged_timeout = 3600000;         // 1 h
-
+pwiTimer flood_unchanged_timer;
 pwiTimer temp_unchanged_timer;
-static const char *st_temp_unchanged_label = "TemperatureUnchangedTimer";
-
 pwiTimer hum_unchanged_timer;
-static const char *st_hum_unchanged_label = "HumidityUnchangedTimer";
-
 pwiTimer door_unchanged_timer;
-static const char *st_door_unchanged_label = "DoorUnchangedTimer";
 
 /* The MySensors part */
 //#define MY_DEBUG
@@ -165,7 +158,6 @@ void sendFlood( void )
 void onFloodUnchangedCb( void *empty )
 {
     sendFlood();
-    flood_unchanged_timer.restart();
 }
 
 /*
@@ -280,14 +272,13 @@ void sendDoor( void )
     
 #ifdef DEBUG_ENABLED
     Serial.print( F( "[sendDoor] " ));
-    Serial.println( st_opened ? PSTR( "door is opened" ) : PSTR( "door is closed" ));
+    Serial.println( st_opened ? F( "door is opened" ) : F( "door is closed" ));
 #endif
 }
 
 void onDoorUnchangedCb( void *empty )
 {
     sendDoor();
-    door_unchanged_timer.restart();
 }
 
 /* **************************************************************************************
@@ -317,14 +308,16 @@ void setup()
     // setup an analog pin as a digital input
     pinMode( OPENING_INPUT, INPUT );
 
-    main_timer.start( "", 250, false, MainLoopCb, NULL );
+    main_timer.start( "MainTimer", st_main_timeout, false, MainLoopCb, NULL );
     main_timer.setDebug( false );
     
-    max_frequency_timer.start( st_max_frequency_label, st_max_frequency_timeout, false, sendTempHumCb, NULL );
-    flood_unchanged_timer.start( st_flood_unchanged_label, st_unchanged_timeout, true, onFloodUnchangedCb, NULL );
-    temp_unchanged_timer.start( st_temp_unchanged_label, st_unchanged_timeout, true, onTempHumUnchangedCb, NULL );
-    hum_unchanged_timer.start( st_hum_unchanged_label, st_unchanged_timeout, true, onTempHumUnchangedCb, NULL );
-    door_unchanged_timer.start( st_door_unchanged_label, st_unchanged_timeout, true, onDoorUnchangedCb, NULL );
+    max_frequency_timer.start( "MaxFrequencyTimer", st_max_frequency_timeout, false, sendTempHumCb, NULL );
+    
+    // unchanged_timer's have 'once=true' because they are restarted when sending a message anyway
+    flood_unchanged_timer.start( "FloodUnchangedTimer", st_unchanged_timeout, true, onFloodUnchangedCb, NULL );
+    temp_unchanged_timer.start( "TemperatureUnchangedTimer", st_unchanged_timeout, true, onTempHumUnchangedCb, NULL );
+    hum_unchanged_timer.start( "HumidityUnchangedTimer", st_unchanged_timeout, true, onTempHumUnchangedCb, NULL );
+    door_unchanged_timer.start( "DoorUnchangedTimer", st_unchanged_timeout, true, onDoorUnchangedCb, NULL );
     
     pwiTimer::Dump();
 }

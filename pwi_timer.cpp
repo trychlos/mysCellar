@@ -4,6 +4,9 @@
 // uncomment to debugging this file
 #define TIMER_DEBUG
 
+// max count of allocatable pwiTimer's
+#define PWITIMER_MAX 15
+
 static pwiTimer *st_timers[PWITIMER_MAX];
 static uint8_t   st_count = 0;
 
@@ -144,7 +147,7 @@ void pwiTimer::restart( void )
  * 
  * Public Static
  */
-static void pwiTimer::Dump( void )
+void pwiTimer::Dump( void )
 {
 #ifdef TIMER_DEBUG
     Serial.print( F( "[pwiTimer::dump]: st_count=" ));
@@ -164,7 +167,7 @@ static void pwiTimer::Dump( void )
  * 
  * Public Static
  */
-static void pwiTimer::Loop( void )
+void pwiTimer::Loop( void )
 {
     for( uint8_t i=0 ; i<st_count ; ++i ){
         st_timers[i]->objLoop();
@@ -229,13 +232,13 @@ void pwiTimer::objLoop( void )
                 Serial.println( duration );
             }
 #endif
-            if( this->cb ){
-                this->cb( this->user_data );
-            }
             if( this->once ){
                 this->start_ms = 0;
             } else {
                 this->start_ms = millis();
+            }
+            if( this->cb ){
+                this->cb( this->user_data );
             }
         }
     }
@@ -246,17 +249,19 @@ void pwiTimer::objLoop( void )
  * @restart: whether we accept to re-start an already started timer.
  * 
  * Start or restart the timer.
+ * 
+ * Private
  */
 void pwiTimer::objStart( bool restart )
 {
     if( this->delay_ms > 0 ){
         if( this->start_ms > 0 && !restart ){
-            Serial.println( F( "[pwiTimer::start] ERROR: timer already started" ));
+            Serial.println( F( "[pwiTimer::objStart] ERROR: timer already started" ));
         } else {
             this->start_ms = millis();
         }
     } else {
-        Serial.println( F( "[pwiTimer::start] ERROR: unable to start the timer while delay is not set" ));
+        Serial.println( F( "[pwiTimer::objStart] ERROR: unable to start the timer while delay is not set" ));
     }
 }
 
