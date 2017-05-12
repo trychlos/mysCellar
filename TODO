@@ -10,7 +10,7 @@
  Todo
  ====
 
-   2
+   3
 
 -----------------------------------------------------------------------
  Done
@@ -20,6 +20,12 @@
                 from the Jeedom controller
      2017- 5- 2 done
 
+   2 2017- 5-10 after a flood, the module sends many on-off messages
+                (probably while it is drying) - and then stays blocked
+                on 'on' state
+     2017- 5-12 fixed
+
 -----------------------------------------------------------------------
  P. Wieser - Created on 2017, apr. 2nd
+             Last updated on 2017, may, 12th
 

@@ -154,14 +154,20 @@ http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-netwo
     |
     +- Sent to controller
         |
-        +- V_VAR1: measures max frequency (ms)
-        +- V_VAR2: unchanged timeout (ms)
+        +- V_VAR1: measures max frequency (ms) in response to CHILD_MAIN:C_REQ:V_CUSTOM:payload=1
+        +- V_VAR2: unchanged timeout (ms) in response to CHILD_MAIN:C_REQ:V_CUSTOM:payload=1
 
  - CHILD_FLOOD (S_WATER_LEAK)
     |
     +- Sent to controller
         |
         +- V_TRIPPED: whether a flooding is detected
+
+ - CHILD_FLOOD_AN (S_CUSTOM)
+    |
+    +- Sent to controller
+        |
+        +- V_VAR1: (starting with 5.2) humidity rate from 0 (flood) to 1024 (dry)
 
  - CHILD_TEMPERATURE (S_TEMP)
     |
@@ -183,4 +189,5 @@ http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-netwo
 
 -----------------------------------------------------------------------
  P. Wieser - Created on 2017, may 2nd.
+             Last updated on 2017, may, 12th
 

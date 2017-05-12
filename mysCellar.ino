@@ -37,13 +37,14 @@
  * 
  * pwi 2017- 3-25 activate repeater feature
  * pwi 2017- 4- 2 use pwiTimer + parms are updatable
+ * pwi 2017- 5-10 better manage post-flood
  */
 
 // uncomment for debugging this sketch
 #define DEBUG_ENABLED
 
 static const char * const thisSketchName    = "mysCellar";
-static const char * const thisSketchVersion = "5.1.2017";
+static const char * const thisSketchVersion = "5.2.2017";
 
 /* 
  * Declare the timers
@@ -54,7 +55,8 @@ static unsigned long st_main_timeout = 250;
 pwiTimer main_timer;
 
 static unsigned long st_max_frequency_timeout = 60000;       // 1 mn
-pwiTimer max_frequency_timer;
+pwiTimer temphum_max_timer;
+pwiTimer flood_max_timer;
 
 static unsigned long st_unchanged_timeout = 3600000;         // 1 h
 pwiTimer flood_unchanged_timer;
@@ -82,7 +84,8 @@ enum {
     CHILD_ID_FLOOD = 10,
     CHILD_ID_TEMPERATURE,
     CHILD_ID_HUMIDITY,
-    CHILD_ID_DOOR
+    CHILD_ID_DOOR,
+    CHILD_ID_FLOOD_AN,
 };
 
 MyMessage msgVar1( 0, V_VAR1 );
@@ -94,33 +97,38 @@ MyMessage msgVar2( 0, V_VAR2 );
 // rain sensor analog output
 #define FLOOD_ANALOGINPUT       (A7)
 #define FLOOD_ANALOG_MIN        (0)            // flooded
-#define FLOOD_ANALOG_MAX        (1024)         // dry
+#define FLOOD_ANALOG_MAX        (1023)         // dry
 // rain sensor digital output
 #define FLOOD_DIGITALINPUT      (4)
 #define FLOOD_DIGITAL_FLOODED   (LOW)
 #define FLOOD_DIGITAL_DRY       (HIGH)
 
+#define FLOOD_LED               (5)
+
 bool st_flooded = false;
+int st_flood_an = 0;
 
 // message type
 MyMessage msgFlood( CHILD_ID_FLOOD, V_TRIPPED );
+MyMessage msgFloodAn( CHILD_ID_FLOOD_AN, V_VAR1 );
 
 /* regarding the flood detection, we are only interested by the digital value
  * analog value is only used during development for debugging help
  * 
- * Returns: %TRUE if change
+ * Sends a change as soon as the measure changes, but not more than 1/mn
+ * 
+ * Returns: %TRUE if a change must be sent
  */
 bool readFlood( void )
 {
     bool prev_flood = st_flooded;
+    int prev_floodan = st_flood_an;
     bool changed = false;
     st_flooded = ( digitalRead( FLOOD_DIGITALINPUT ) == FLOOD_DIGITAL_FLOODED );
-    if( st_flooded != prev_flood ){
+    st_flood_an = analogRead( FLOOD_ANALOGINPUT );
+    if(( st_flooded != prev_flood || st_flood_an != prev_floodan ) && !flood_max_timer.isStarted()){
         changed = true;
-#ifdef DEBUG_ENABLED
-        Serial.print( F( "[readFlood] flooded=" ));
-        Serial.println( st_flooded ? "True":"False" );
-#endif
+        digitalWrite( FLOOD_LED, st_flooded ? HIGH : LOW );
     }
     return( changed );
 }
@@ -128,30 +136,36 @@ bool readFlood( void )
 void sendFlood( void )
 {
     send( msgFlood.set( st_flooded ));
+    send( msgFloodAn.set( st_flood_an ));
+
+    flood_max_timer.start();
     flood_unchanged_timer.restart();
 
 #ifdef DEBUG_ENABLED
-    uint8_t av = analogRead( FLOOD_ANALOGINPUT );
-    uint8_t range = map( av, FLOOD_ANALOG_MIN, FLOOD_ANALOG_MAX, 0, 3 );
-    Serial.println( F( "[RainSensor] analogValue=" ));
-    Serial.print( av );
-    Serial.print( F( ", mapped=" ));
+    Serial.print( F( "[sendFlood] analogValue=" ));
+    Serial.print( st_flood_an );
+    Serial.print( F( ", digitalValue=" ));
+    Serial.print( st_flooded ? "High":"Low" );
+    Serial.print( F( " => flooded=" ));
+    Serial.println( st_flooded ? "True":"False" );
+
+    uint8_t range = map( st_flood_an, FLOOD_ANALOG_MIN, FLOOD_ANALOG_MAX, 0, 3 );
+    Serial.print( F( "[sendFlood] mapped=" ));
     Serial.print( range );
     switch( range ){
         case 0:    // Sensor getting wet
-            Serial.println( F( "  => Flood" ));
+            Serial.println( F( " => Flood" ));
             break;
         case 1:    // Sensor getting wet
-            Serial.println( F( "  => Rain Warning" ));
+            Serial.println( F( " => Raining" ));
             break;
-        case 2:    // Sensor dry - To shut this up delete the " Serial.println("Not Raining"); " below.
-            Serial.println( F( "  => Not Raining" ));
+        case 2:    // Sensor dry
+            Serial.println( F( " => Wet" ));
+            break;
+        case 3:    // Sensor dry
+            Serial.println( F( " => Dry" ));
             break;
     }
-    Serial.print( F( "[RainSensor] digitalValue=" ));
-    Serial.print( st_flooded ? "High":"Low" );
-    Serial.print( F( "  => flooded=" ));
-    Serial.println( st_flooded ? "True":"False" );
 #endif
 }
 
@@ -231,7 +245,15 @@ void sendTempHum( bool force )
         st_hum_prev = st_hum;
         hum_unchanged_timer.restart();
     }
-    max_frequency_timer.restart();
+    temphum_max_timer.restart();
+
+#ifdef DEBUG_ENABLED
+    Serial.print( F( "[sendTempHum] temp=" ));
+    Serial.print( st_temp );
+    Serial.print( F( "°C, hum=" ));
+    Serial.print( st_hum );
+    Serial.println( F( "%" ));
+#endif
 }
 
 /*
@@ -244,11 +266,12 @@ void sendTempHum( bool force )
  * - door opened: contact is opened.
  */
 #define OPENING_INPUT           (A0)           // use analog pin as a digital input
+#define OPENING_LED             (A1)
+
 // message type
+MyMessage msgDoor( CHILD_ID_DOOR, V_TRIPPED );
 
 bool st_opened = false;
-
-MyMessage msgDoor( CHILD_ID_DOOR, V_TRIPPED );
 
 bool readDoor( void  )
 {
@@ -257,6 +280,7 @@ bool readDoor( void  )
     st_opened = ( digitalRead( OPENING_INPUT ) == HIGH );
     if( st_opened != prev_opened ){
         changed = true;
+        digitalWrite( OPENING_LED, st_opened ? HIGH : LOW );
 #ifdef DEBUG_ENABLED
         Serial.print( F( "[readDoor] opened=" ));
         Serial.println( st_opened ? "True":"False" );
@@ -292,6 +316,7 @@ void presentation()
     sendSketchInfo( thisSketchName, thisSketchVersion );
     present( CHILD_MAIN, S_CUSTOM );
     present( CHILD_ID_FLOOD,       S_WATER_LEAK, "Flood detection" );
+    present( CHILD_ID_FLOOD_AN,    S_CUSTOM,     "Analog flood detection" );
     present( CHILD_ID_TEMPERATURE, S_TEMP,       "Temperature measure" );
     present( CHILD_ID_HUMIDITY,    S_HUM,        "Humidity measure" );
     present( CHILD_ID_DOOR,        S_DOOR,       "Door opening detection" );
@@ -304,15 +329,24 @@ void setup()
     Serial.println( F( "[setup]" ));
 #endif
 
+    // flood detection
+    digitalWrite( FLOOD_LED, LOW );
+    pinMode( FLOOD_LED, OUTPUT );
+    
+    // temperature/humidity
     dht.setup( TEMPHUM_DIGITALINPUT, DHT::AM2302 ); 
-    // setup an analog pin as a digital input
+    
+    // opening door
     pinMode( OPENING_INPUT, INPUT );
+    digitalWrite( OPENING_LED, LOW );
+    pinMode( OPENING_LED, OUTPUT );
 
     main_timer.start( "MainTimer", st_main_timeout, false, MainLoopCb, NULL );
     main_timer.setDebug( false );
     
-    max_frequency_timer.start( "MaxFrequencyTimer", st_max_frequency_timeout, false, sendTempHumCb, NULL );
-    
+    flood_max_timer.set( "AnalogFloodMaxFrequencyTimer", st_max_frequency_timeout, true, NULL, NULL );
+    temphum_max_timer.start( "TempmHumMaxFrequencyTimer", st_max_frequency_timeout, false, sendTempHumCb, NULL );
+
     // unchanged_timer's have 'once=true' because they are restarted when sending a message anyway
     flood_unchanged_timer.start( "FloodUnchangedTimer", st_unchanged_timeout, true, onFloodUnchangedCb, NULL );
     temp_unchanged_timer.start( "TemperatureUnchangedTimer", st_unchanged_timeout, true, onTempHumUnchangedCb, NULL );
@@ -369,7 +403,7 @@ void receive(const MyMessage &message)
                 switch( req ){
                     case 1:
                         st_max_frequency_timeout = strlen( payload ) > 2 ? atol( payload+2 ) : 0;
-                        max_frequency_timer.set( st_max_frequency_timeout );
+                        temphum_max_timer.set( st_max_frequency_timeout );
                         break;
                     case 2:
                         st_unchanged_timeout = strlen( payload ) > 2 ? atol( payload+2 ) : 0;

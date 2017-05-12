@@ -3,9 +3,29 @@
  Summary
  =======
  
+   Version 5.2.2017
    Version 5.1.2017
    Version 5.0.2017
    Version 4-2017
+
+-----------------------------------------------------------------------
+ Version 5.2.2017
+ ================
+
+ Released on 2017-05-12
+
+ New features and improvements:
+
+   - Send the flood sensor analog value to the controller (todo #2).
+   - Have LEDs to signal the alert status.
+
+ Bug fixes:
+
+   - 
+
+ Other changes:
+
+   - 
 
 -----------------------------------------------------------------------
  Version 5.1.2017
