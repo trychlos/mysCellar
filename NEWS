@@ -3,10 +3,31 @@
  Summary
  =======
  
+   Version 6.0.2017
    Version 5.2.2017
    Version 5.1.2017
    Version 5.0.2017
    Version 4-2017
+
+-----------------------------------------------------------------------
+ Version 6.0.2017
+ ================
+
+ Released on 2017-05-20
+
+ New features and improvements:
+
+   - Always send analog values from rain sensor used for flood detection.
+   - Have an ARMED LED for flood detection, and manage corresponding messages.
+   - Unarmed the flood detection after an alert has been triggered.
+
+ Bug fixes:
+
+   - 
+
+ Other changes:
+
+   - 
 
 -----------------------------------------------------------------------
  Version 5.2.2017

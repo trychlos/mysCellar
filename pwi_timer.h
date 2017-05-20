@@ -40,10 +40,9 @@ class pwiTimer {
     public:
         pwiTimer( void );
         bool          isStarted();
-        void          set( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb, void *user_data = NULL );
-        void          set( unsigned long delay_ms );
-        void          setDebug( bool debug );
-        void          start( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb = NULL, void *user_data = NULL );
+        void          set( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb=NULL, void *user_data=NULL, bool debug=true );
+        void          setDelay( unsigned long delay_ms );
+        void          start( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb=NULL, void *user_data=NULL, bool debug=true );
         void          start( void );
         void          restart( void );
 
@@ -51,13 +50,14 @@ class pwiTimer {
         static void   Loop();
 
     private:
+        const char   *label;
         unsigned long delay_ms;
         bool          once;
         pwiTimerCb    cb;
         void         *user_data;
-        unsigned long start_ms;
-        const char   *label;
         bool          debug;
+
+        unsigned long start_ms;
 
         void          objDump( uint8_t idx );
         void          objLoop( void );

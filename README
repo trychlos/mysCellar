@@ -20,12 +20,19 @@
  It sends to the controller:
  - the current temperature
  - the current humidity rate
+ - the current flood sensor analog value
  - an alert when the door is opened or closed
  - an alert when the cellar is flooded.
 
- Current temperature and humidity rate are sent on a configurable period.
- Door and flooding alerts are sent as soon as they are detected.
- Door and flooding status are re-sent on a configurable period.
+ Current temperature, humidity rate and flood sensor analog values, later
+ said "measures" are only sent when changed, but not more than the
+ configurable 'max_frequency'.
+
+ Flood and door alarms, later said "alarms" are sent as soon as they are
+ detected.
+
+ If they do not change, measure and alarm status are periodically re-sent
+ on a configurable 'unchanged' timeout.
 
 -----------------------------------------------------------------------
  CAV-01 - Flooding detection
@@ -45,6 +52,18 @@
         off , dripping a drop of water , DO output is low , the switch
         indicator light,
 
+  Though the detection is quasi-immediate, returning to the normal state
+  leads to many bounces. In order to prevent these bounces to trigger
+  false alerts, the sensor is automatically unarmed after an alarm has
+  been triggered.
+  The sensors then auto-rearms itself after a configurable 'auto_rearm'
+  delay.
+
+  The flood sensor has two indicator lights:
+  - whether the sensor is armed (added in v 6.0.2017),
+  - whether an alarm has been trigerred (added in v 6.0.2017);
+    this later light stays On until the alarm is rearmed.
+
     Nano output:
     - VCC 5v to sensor
     - GND
@@ -52,6 +71,8 @@
     Nano input
     - logical D0 (from HIGH=dry to LOW=wet) -> D4 [D4]
     - analog A0 (from 1023=dry to 0=soak)   -> ADC7 (analog only) [A7]
+    - logical D5 (output) : whether the alarm has been tripped
+    - logical D6 (output) : whether the alarm is armed
 
 [1] http://www.instructables.com/id/Arduino-Modules-Rain-Sensor/
 [2] http://www.aliexpress.com/snapshot/6826183159...
@@ -98,6 +119,9 @@ http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-netwo
 
  A 10k resistor is connected to get the opening detection.
 
+ The opening sensor has one indicator light:
+ - whether the door is opened (A1).
+
 -----------------------------------------------------------------------
  Arduino pins
  ============
@@ -106,16 +130,19 @@ http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-netwo
   D0/RX:
   RST:
   GND:
-  A0:               door opening detection
   D2/INT0:          radio module IRQ
   D3:       (input) temp-hygro sensor SDA output
   D4:       (input) rain sensor digital output
+  D5:      (output) rain sensor alarm tripped
+  D6:      (output) rain sensor alarm armed
   D9:               radio module CE
   D10/CSN:          radio module CSN
   D11/MOSI:         radio module MOSI
   D12/MISO:         radio module MISO
   D13/SCK:          radio module SCK
   3.3V:             radio module VCC
+  A0:               door opening detection
+  A1:      (output) door opening detection tripped
   A7:       (input) rain sensor analog output
   5V:               rain sensor VCC
                    +temp-hygro sensor VCC
@@ -124,7 +151,7 @@ http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-netwo
                    +radio module GND
                    +door opening detection GND
                    +alimentation GND
-  VIN:       alimentation +5v
+  VIN:              alimentation +5v
 
 -----------------------------------------------------------------------
  Interactions
@@ -144,30 +171,44 @@ http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-netwo
     |   |
     |   +- C_SET
     |   |   |
-    |   |   +- V_CUSTOM with payload = '1=<value>': set the measures max frequency (default is 1mn - ms).
+    |   |   +- V_CUSTOM with payload = '1=<value>': set the measures max frequency (default is 2mn - ms).
     |   |   +- V_CUSTOM with payload = '2=<value>': set the unchanged timeout (default is 1h - ms).
+    |   |   |                                       this concerns both alarms and measures.
+    |   |   +- V_CUSTOM with payload = '3': reset the Eeprom to default values
     |   |
     |   +- C_REQ
     |       |
-    |       +- V_CUSTOM with payload = '1': request a configuration dump
-    |                                       send the configuration parameters along with the value of the sensors
+    |       +- V_CUSTOM with payload = '1': request a configuration dump;
+    |                                       send the configuration parameters along with the current value of each sensors.
     |
     +- Sent to controller
         |
-        +- V_VAR1: measures max frequency (ms) in response to CHILD_MAIN:C_REQ:V_CUSTOM:payload=1
-        +- V_VAR2: unchanged timeout (ms) in response to CHILD_MAIN:C_REQ:V_CUSTOM:payload=1
+        +- V_VAR1: measures max frequency (ms) in response to CHILD_MAIN:C_REQ:V_CUSTOM:payload=1.
+        +- V_VAR2: unchanged timeout (ms) in response to CHILD_MAIN:C_REQ:V_CUSTOM:payload=1.
 
  - CHILD_FLOOD (S_WATER_LEAK)
+   This is the digital part of the rain sensor, used as boolean flooding sensor.
+    |
+    +- Received from controller
+    |   |
+    |   +- C_SET
+    |       |
+    |       +- V_ARMED with payload = '1|0': arms (resp. unarms) the flood sensor (permanent status).
+    |       +- V_CUSTOM with payload = '1=<value>': set the automatic rearm delay (default is 12h - ms).
     |
     +- Sent to controller
         |
-        +- V_TRIPPED: whether a flooding is detected
+        +- V_ARMED: whether the flood sensor is armed (permanent status).
+        +- V_TRIPPED: whether a flooding is detected.
+        +- V_VAR1: automatic rearm delay (ms) in response to CHILD_MAIN:C_REQ:V_CUSTOM:payload=1.
+        +- V_VAR2: whether the flood sensor is armed (current status).
 
- - CHILD_FLOOD_AN (S_CUSTOM)
+ - CHILD_RAIN (S_RAIN)
+   This is the analog part of the rain sensor, used as analog flooding sensor for debounce estimations.
     |
     +- Sent to controller
         |
-        +- V_VAR1: (starting with 5.2) humidity rate from 0 (flood) to 1024 (dry)
+        +- V_RAIN: (starting with 5.2) humidity rate from 0 (flood) to 1023 (dry)
 
  - CHILD_TEMPERATURE (S_TEMP)
     |

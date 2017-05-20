@@ -52,18 +52,19 @@ bool pwiTimer::isStarted( void )
  * @once: whether the @cb callback must be called only once, or regularly.
  * @cb: [allow-none]: the callback.
  * @user_data: [allow-none]: the user data to be passed to the callback.
+ * @debug: [allow-none]: whether the pwiTimer behavior should be debugged.
  * 
  * Initialize the timer.
  * After having been initialized, the timer may be started.
- * The @cb callback will be called at the expiration of the @delay_ms.
+ * If set, the @cb callback will be called at the expiration of the @delay_ms.
  * 
  * If @once is %TRUE, the timer is then disabled, and will stay inactive
  * until started another time.
  * 
- * If @once is %FALSE, the @cb callback will ba called regularly each
+ * If @once is %FALSE, the @cb callback will be called regularly each
  * @delay_ms.
  */
-void pwiTimer::set( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb, void *user_data )
+void pwiTimer::set( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb, void *user_data, bool debug )
 {
     if( strlen( label )){
         this->label = label;
@@ -72,31 +73,18 @@ void pwiTimer::set( const char *label, unsigned long delay_ms, bool once, pwiTim
     this->once = once;
     this->cb = cb;
     this->user_data = user_data;
+    this->debug = debug;
 }
 
 /**
- * pwiTimer::set:
+ * pwiTimer::setDelay:
  * @delay_ms: the duration of the timer; must be greater than zero.
  * 
  * Change the configured delay.
  */
-void pwiTimer::set( unsigned long delay_ms )
+void pwiTimer::setDelay( unsigned long delay_ms )
 {
     this->delay_ms = delay_ms;
-}
-
-/**
- * pwiTimer::setDebug:
- * @debug: whether this timer should be debugged.
- * 
- * Set the @debug flag.
- * 
- * This is mainly used for the main timer which expires very too often
- * to be valuably debugged.
- */
-void pwiTimer::setDebug( bool debug )
-{
-    this->debug = debug;
 }
 
 /**
@@ -108,12 +96,13 @@ void pwiTimer::setDebug( bool debug )
  * @once: whether the @cb callback must be called only once, or regularly.
  * @cb: [allow-none]: the callback.
  * @user_data: [allow-none]: the user data to be passed to the callback.
+ * @debug: [allow-none]: whether the pwiTimer behavior should be debugged.
  * 
  * Initialize and start the timer.
  */
-void pwiTimer::start( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb, void *user_data )
+void pwiTimer::start( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb, void *user_data, bool debug )
 {
-    this->set( label, delay_ms, once, cb, user_data );
+    this->set( label, delay_ms, once, cb, user_data, debug );
     this->start();
 }
 
