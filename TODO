@@ -10,7 +10,21 @@
  Todo
  ====
 
-   3
+   3 2019- 5-16 review messages so that all actions/configurations are on child 0
+				all status come from one child per capteur with different messages
+                cf. next_version
+
+   4 2019- 5-16 version scheme should be x.y.z-yyyy
+
+   5 2019- 5-16 send library version at setup
+
+   6 2019- 5-16 make sure each configuration change send the new value as an ack
+
+   7 2019- 5-16 make sure it is relevant to distinguish arm_current_status vs. arm_eeprom
+
+   8 2019- 5-16 keep the lights on even if the door is closed ?
+
+   9
 
 -----------------------------------------------------------------------
  Done
@@ -27,5 +41,5 @@
 
 -----------------------------------------------------------------------
  P. Wieser - Created on 2017, apr. 2nd
-             Last updated on 2017, may, 12th
+             Last updated on 2019, may, 16th
 

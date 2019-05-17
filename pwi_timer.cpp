@@ -34,13 +34,37 @@ pwiTimer::pwiTimer( void )
 }
 
 /**
+ * pwiTimer::getRemaining:
+ *
+ * Returns: the remaining count of ms.
+ */
+unsigned long pwiTimer::getRemaining( void )
+{
+    unsigned long duration = untilNow( millis(), this->start_ms );
+    unsigned long remaining = untilNow( this->delay_ms, duration );
+#ifdef TIMER_DEBUG
+    Serial.print( F( "[pwiTimer::getRemaining] delay_ms=" ));
+    Serial.print( this->delay_ms );
+    Serial.print( F( ", start_ms=" ));
+    Serial.print( this->start_ms );
+    Serial.print( F( ", now=" ));
+    Serial.print( millis());
+    Serial.print( F( ", duration=" ));
+    Serial.print( duration );
+    Serial.print( F( ", remaining=" ));
+    Serial.print( remaining );
+#endif
+    return( remaining );
+}
+
+/**
  * pwiTimer::isStarted:
  * 
  * Returns: %TRUE if the timer is started.
  */
 bool pwiTimer::isStarted( void )
 {
-    return( this->start_ms > 0 ); 
+    return( this->start_ms > 0 );
 }
 
 /**
@@ -116,6 +140,16 @@ void pwiTimer::start( const char *label, unsigned long delay_ms, bool once, pwiT
 void pwiTimer::start( void )
 {
     this->objStart( false );
+}
+
+/**
+ * pwiTimer::stop:
+ *
+ * Stop a timer.
+ */
+void pwiTimer::stop( void )
+{
+    this->start_ms = 0;
 }
 
 /**

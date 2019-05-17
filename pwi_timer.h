@@ -39,11 +39,13 @@ typedef void ( *pwiTimerCb )( void * );
 class pwiTimer {
     public:
         pwiTimer( void );
+        unsigned long getRemaining();
         bool          isStarted();
         void          set( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb=NULL, void *user_data=NULL, bool debug=true );
         void          setDelay( unsigned long delay_ms );
         void          start( const char *label, unsigned long delay_ms, bool once, pwiTimerCb cb=NULL, void *user_data=NULL, bool debug=true );
         void          start( void );
+        void          stop( void );
         void          restart( void );
 
         static void   Dump();

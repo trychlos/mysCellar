@@ -20,14 +20,51 @@
  * http://www.instructables.com/id/Arduino-Modules-Rain-Sensor/
  * Sends a boolean value to MySensors gateway
  *
- * Temperature/Humidity measures:
+ * Temperature/Humidity measures
+ * -----------------------------
  * Based on humidity sensor by Henrik Ekblad <henrik.ekblad@mysensors.org>
  * Copyright (C) 2013-2015 Sensnology AB
  * http://www.mysensors.org/build/humidity
  * Uses DHT22/AM2302 module
  *
- * Radio module:
+ * Temperature and humidity measures:
+ * - measure (°C or %)
+ * - read sensor period (ms)
+ * - unchanged timeout (ms)
+ *   though rather useless as measures change every time we are reading the sensors
+ *
+ * Door opening detection
+ * ----------------------
+ *
+ * Radio module
+ * ------------
  * Is implemented with a NRF24L01+ radio module
+ *
+ * Input/output messages
+ * ---------------------
+ *  - Input, aka actions, aka messages received by this node from the gateway
+ *  - Output, aka informations, aka messages sent by this node to the gateway
+ *
+ *    Sens  Child                 Id  Cmd    Message    Payload     Comment
+ *    ----  --------------------  --  -----  ---------  ----------  ------------------------------------------------------------------------------
+ *    In    CHILD_MAIN_0           0  C_SET  V_CUSTOM   1           reset EEPROM
+ *    In    CHILD_MAIN_0           0  C_SET  V_CUSTOM   2;<ms>      set max frequency for all status, def_max_frequency_timeout = 120000 (2mn)
+ *    In    CHILD_MAIN_0           0  C_SET  V_CUSTOM   3;<ms>      set unchanged timeout for all status, def_unchanged_timeout = 3600000 (1h)
+ *    In    CHILD_MAIN_0           0  C_SET  V_CUSTOM   4;<ms>      set timeout for alerts, def_alert_timeout = 250ms
+ *    In    CHILD_MAIN_0           0  C_REQ  V_CUSTOM   1           dump configuration
+ *    In    CHILD_ID_FLOOD_0      10  C_SET  V_ARMED    0|1         arm (payload>0) / unarm (payload=0) the flood alarm
+ *    In    CHILD_ID_FLOOD_0      10  C_SET  V_CUSTOM   1;<ms>      set the rearm delay of the flood alarm, def_flood_rearm_delay = 43200000 (12h)
+ *    Out   CHILD_MAIN_0           0         V_VAR1     <ms>        dump configuration: max frequency
+ *    Out   CHILD_MAIN_1           1         V_VAR1     <ms>        dump configuration: unchanged timeout
+ *    Out   CHILD_MAIN_2           2         V_VAR1     <ms>        dump configuration: alert timeout
+ *    Out   CHILD_ID_FLOOD_0      10         V_VAR1     true|false  dump configuration: whether the flood alarm is armed (EEPROM status)
+ *    Out   CHILD_ID_FLOOD_1      11         V_VAR1     true|false  dump configuration: whether the flood alarm is armed (current status)
+ *    Out   CHILD_ID_FLOOD_2      12         V_TRIPPED  true|false  whether the flood alarm is tripped
+ *    Out   CHILD_ID_FLOOD_3      13         V_VAR1     <ms>        dump configuration: rearm delay of the flood alarm
+ *    Out   CHILD_ID_RAIN         20         V_RAIN     <num>       rain analogic value
+ *    Out   CHILD_ID_TEMPERATURE  21         V_TEMP     <num>       temperature
+ *    Out   CHILD_ID_HUMIDITY     22         V_HUM      <num>       humidity
+ *    Out   CHILD_ID_DOOR         23         V_DOOR     true|false  whether the door is opened
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -39,6 +76,8 @@
  * pwi 2017- 4- 2 use pwiTimer + parms are updatable
  * pwi 2017- 5-10 better manage post-flood
  * pwi 2017- 5-15 review flood subsystem
+ * pwi 2017- 5-22 fix flood rearming
+ * pwi 2019- 5-16 improve comments
  */
 
 // uncomment for debugging this sketch
@@ -48,15 +87,16 @@
 #define EEPROM_DEBUG
 
 static const char * const thisSketchName    = "mysCellar";
-static const char * const thisSketchVersion = "6.0.2017";
+static const char * const thisSketchVersion = "6.1.2017";
 
 /*
  * The current configuration
- * Read from/Written to the EEPROM
+ * Read from/written to the EEPROM
  */
 typedef struct {
-    /* a 'PWI' string with a null-terminating byte which marks the structure as initialized */
+    /* a 'PWI' null-terminated string which marks the structure as initialized */
     char mark[4];
+    unsigned long alert_timeout;
     unsigned long max_frequency_timeout;
     unsigned long unchanged_timeout;
     /* the permanent status of flood alarm armed (not modified on tripped) */
@@ -72,7 +112,7 @@ sEeprom eeprom;
  */
 #include "pwi_timer.h"
 
-static unsigned long st_main_timeout = 250;
+static unsigned long def_alert_timeout = 250;                   // this is the alarm reaction time
 static unsigned long def_max_frequency_timeout = 120000;        // 2 mn
 static unsigned long def_unchanged_timeout = 3600000;           // 1 h
 static unsigned long def_flood_rearm_delay = 43200000;          // 12h
@@ -93,18 +133,27 @@ static unsigned long def_flood_rearm_delay = 43200000;          // 12h
  * - measure sensors react to measure timers (have a min frequency and a max frequency)
  */
 enum {
-    CHILD_MAIN = 0,
-    CHILD_ID_FLOOD = 10,
+    CHILD_MAIN_0 = 0,
+    CHILD_MAIN_1,
+    CHILD_MAIN_2,
+    CHILD_ID_FLOOD_0 = 10,
+    CHILD_ID_FLOOD_1,
+    CHILD_ID_FLOOD_2,
+    CHILD_ID_FLOOD_3,
+    CHILD_ID_FLOOD_4,
+    CHILD_ID_RAIN = 20,
     CHILD_ID_TEMPERATURE,
     CHILD_ID_HUMIDITY,
     CHILD_ID_DOOR,
-    CHILD_ID_RAIN,
 };
 
 MyMessage msg;
 
 /*
- * Flood detection
+ * Flood detection is provided by a rain sensor which itself provides
+ *  both digital and analog values:
+ *  - digital value is used as an armable alert.
+ *  - analog value is managed as a standard measure.
  */
 // rain sensor analog output
 #define FLOOD_ANALOGINPUT       (A7)
@@ -120,157 +169,176 @@ MyMessage msg;
 
 bool st_flood_armed = false;                   // flood armed
 bool st_flood_tripped = false;                 // flood detected
+
+pwiTimer st_flood_remaining_timer;
+pwiTimer st_flood_alert_timer;
 pwiTimer st_flood_unchanged_timer;
 pwiTimer st_flood_rearm_timer;
 
-int st_rain = 0;
 pwiTimer st_rain_mf_timer;
 pwiTimer st_rain_unchanged_timer;
-
-/* Set the tripped status of the flood detection
- * Update the EEPROM accordingly.
- */
-void floodSetTripped( bool tripped )
-{
-    st_flood_tripped = tripped;
-    digitalWrite( FLOOD_TRIPPED_LED, st_flood_tripped ? HIGH:LOW );
-}
 
 /* Set the armed status of the flood detection
  *  - either because a flood has been detected, and only set a current armed status
  *  - or because the configuration has been requested to change, and then also set
  *    the permanent armed status in the eeprom.
  */
-void floodSetArmed( bool armed, bool bPermanent=true )
+void floodSetArmed( bool armed, bool bPermanent=true, bool bSend=true )
 {
     st_flood_armed = armed;
-    
     digitalWrite( FLOOD_ARMED_LED, st_flood_armed ? HIGH:LOW );
 
     if( bPermanent ){
         floodSetTripped( false );
         eeprom.flood_armed = st_flood_armed;
         eeprom_write( eeprom );
-        sendFloodArmed();
     }
+
+    if( bSend ){
+        floodSendArmed();
+    }
+
+    st_flood_remaining_timer.stop();
 }
 
-void onFloodRearmCb( void *empty )
-{
-#ifdef DEBUG_ENABLED
-    Serial.println( F( "[onFloodRearmCb]" ));
-#endif
-    floodSetArmed( true, false );
-}
-
-void sendFloodArmed( void )
+void floodSendArmed( void )
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_FLOOD ).setType( V_ARMED ).set( eeprom.flood_armed ));
+    send( msg.setSensor( CHILD_ID_FLOOD_1 ).setType( V_VAR1 ).set( st_flood_armed ));
+    msg.clear();
+    send( msg.setSensor( CHILD_ID_FLOOD_0 ).setType( V_VAR1 ).set( eeprom.flood_armed ));
+}
+
+/* Set the tripped status of the flood detection.
+ *  Send the corresponding message to the controller.
+ *  On tripped:
+ *  - unarms the alarm
+ *  - start the rearm timer
+ *  - start a timer to advertise the controller of the remaining on MaxFrequency
+ */
+void floodSetTripped( bool tripped )
+{
+    st_flood_tripped = tripped;
+    digitalWrite( FLOOD_TRIPPED_LED, st_flood_tripped ? HIGH:LOW );
+
+    // if flood sensor is tripped, then disable the alert
+    // and start the timer to rearm it later
+    if( tripped ){
+        floodSetArmed( false, false );
+        st_flood_rearm_timer.start();
+        st_flood_remaining_timer.start();
+    }
 }
 
 /* Regarding the flood detection, we are only interested by the digital value
- * Sends a change as soon as the measure changes, but not more than 1/mn
- * 
- * Returns: %TRUE if a change must be sent
+ * Sends a change as soon as the measure changes.
+ * Does not send anything if the alarm is not armed.
  */
-bool readFlood( void )
+void floodReadAndSend( bool forceSend )
 {
-    bool flooded = false;
-    bool changed = false;
-
     if( st_flood_armed ){
-        bool prev_flood = st_flood_tripped;
-        flooded = ( digitalRead( FLOOD_DIGITALINPUT ) == FLOOD_DIGITAL_FLOODED );
-        changed |= ( prev_flood != flooded );
+        bool changed = false;
+        bool cur_flooded = ( digitalRead( FLOOD_DIGITALINPUT ) == FLOOD_DIGITAL_FLOODED );
+        if( cur_flooded != st_flood_tripped ){
+            floodSetTripped( cur_flooded );
+            changed = true;
+        }
+        if( changed || forceSend ){
+            msg.clear();
+            send( msg.setSensor( CHILD_ID_FLOOD_2 ).setType( V_TRIPPED ).set( st_flood_tripped ));
+            st_flood_unchanged_timer.restart();
+#ifdef DEBUG_ENABLED
+            Serial.print( F( "[floodReadAndSend] forceSend=" ));
+            Serial.print( forceSend ? "True":"False" );
+            Serial.print( F( ", changed=" ));
+            Serial.print( changed ? "True":"False" );
+            Serial.print( F( ", flooded=" ));
+            Serial.println( st_flood_tripped ? "True":"False" );
+#endif
+        }
     }
-    if( changed ){
-        floodSetTripped( flooded );
-    }
-    
-    return( changed );
 }
 
-void sendFlood( void )
+void floodOnAlertCb( void *empty )
+{
+    floodReadAndSend( false );
+}
+
+void floodOnUnchangedCb( void *empty )
+{
+    floodReadAndSend( true );
+    floodSendArmed();
+}
+
+void floodOnRearmCb( void *empty )
+{
+    floodSetArmed( true, false );
+}
+
+void floodOnRemainingCb( void *empty )
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_FLOOD ).setType( V_TRIPPED ).set( st_flood_tripped ));
-    st_flood_unchanged_timer.restart();
-
-    // if flood sensor is tripped, then disable the alert
-    // and restart the timer to rearm
-    if( st_flood_tripped ){
-        floodSetArmed( false, false );
-        st_flood_rearm_timer.start();
-    }
-
-#ifdef DEBUG_ENABLED
-    Serial.print( F( "[sendFlood] flood=" ));
-    Serial.println( st_flood_tripped ? "True":"False" );
-#endif
+    send( msg.setSensor( CHILD_ID_FLOOD_4 ).setType( V_VAR1 ).set( st_flood_rearm_timer.getRemaining()));
 }
 
-void onFloodUnchangedCb( void *empty )
-{
-    sendFlood();
-}
-
-/* Dealing with analog part of the rain sensor
- * 
- * Returns: %TRUE if a change must be sent
+/* Dealing with analog part of the rain sensor.
  */
-bool readRain( void )
+void rainReadAndSend( bool forceSend )
 {
+    static int last_rain = 0;
     bool changed = false;
 
-    if( !st_rain_mf_timer.isStarted()){
-        int prev_rain = st_rain;
-        st_rain = analogRead( FLOOD_ANALOGINPUT );
-        changed |= ( prev_rain != st_rain );
+    int cur_rain = analogRead( FLOOD_ANALOGINPUT );
+    if( cur_rain != last_rain ){
+        last_rain = cur_rain;
+        changed = true;
     }
 
-    return( changed );
+    if( changed || forceSend ){
+        msg.clear();
+        send( msg.setSensor( CHILD_ID_RAIN ).setType( V_RAIN ).set( last_rain ));
+        st_rain_unchanged_timer.restart();
+#ifdef DEBUG_ENABLED
+        Serial.print( F( "[rainReadAndSend] forceSend=" ));
+        Serial.print( forceSend ? "True":"False" );
+        Serial.print( F( ", changed=" ));
+        Serial.print( changed ? "True":"False" );
+        Serial.print( F( ", rain=" ));
+        Serial.print( last_rain );
+        uint8_t range = map( last_rain, FLOOD_ANALOG_MIN, FLOOD_ANALOG_MAX, 0, 3 );
+        Serial.print( F( ", mapped=" ));
+        Serial.print( range );
+        switch( range ){
+            case 0:    // Sensor getting wet
+                Serial.println( F( " (flood)" ));
+                break;
+            case 1:    // Sensor getting wet
+                Serial.println( F( " (raining)" ));
+                break;
+            case 2:    // Sensor dry
+                Serial.println( F( " (wet)" ));
+                break;
+            case 3:    // Sensor dry
+                Serial.println( F( " (dry)" ));
+                break;
+        }
+#endif
+    }
 }
 
-void sendRain( void )
+void rainOnMaxFrequencyCb( void *empty )
 {
-    msg.clear();
-    send( msg.setSensor( CHILD_ID_RAIN ).setType( V_RAIN ).set( st_rain ));
-    st_rain_mf_timer.restart();
-    st_rain_unchanged_timer.restart();
-
-#ifdef DEBUG_ENABLED
-    Serial.print( F( "[sendRain] analogValue=" ));
-    Serial.print( st_rain );
-    uint8_t range = map( st_rain, FLOOD_ANALOG_MIN, FLOOD_ANALOG_MAX, 0, 3 );
-    Serial.print( F( ", mapped=" ));
-    Serial.print( range );
-    switch( range ){
-        case 0:    // Sensor getting wet
-            Serial.println( F( " => Flood" ));
-            break;
-        case 1:    // Sensor getting wet
-            Serial.println( F( " => Raining" ));
-            break;
-        case 2:    // Sensor dry
-            Serial.println( F( " => Wet" ));
-            break;
-        case 3:    // Sensor dry
-            Serial.println( F( " => Dry" ));
-            break;
-    }
-#endif
+    rainReadAndSend( false );
 }
 
 void onRainUnchangedCb( void *empty )
 {
-    sendRain();
+    rainReadAndSend( true );
 }
 
 /*
  * Temperature/Humidity DHT22/AM2302 sensors
- * As there is only one sensor for the two measures, we take the two measures
- * together, and send the two messages together also.
+ * There is only one physical sensor module for the two measures.
  */
 #include <DHT.h>  
 DHT dht;
@@ -280,92 +348,94 @@ DHT dht;
 
 pwiTimer st_temp_mf_timer;
 pwiTimer st_temp_unchanged_timer;
-float st_temp = 0;
 
 pwiTimer st_hum_mf_timer;
 pwiTimer st_hum_unchanged_timer;
-float st_hum = 0;
 
-/* temperature and humidity measures actually return the last value
- * cached by the library; the library takes care itself of respecting
- * the minimal sampling period
- * 
- * Returns: %TRUE if changed.
+/* Read the temperature as a float.
+ * If changed or @forceSend is %true, then send the temperature value to the controller.
  */
-bool readTemp( void )
+void tempReadAndSend( bool forceSend )
 {
+    static float last_temp = 0.0;
     bool changed = false;
 
-    if( !st_temp_mf_timer.isStarted()){
-        float prev_temp = st_temp;
-        // Get temperature from DHT library
-        float temp = dht.getTemperature();
-        if( isnan( temp )){
-            Serial.println( F( "[readTemp] failed reading temperature from DHT" ));
-        } else {
-            st_temp = temp;
-            changed |= ( prev_temp != st_temp );
-        }
+    // Get temperature from DHT library
+    float cur_temp = dht.getTemperature();
+    if( isnan( cur_temp )){
+        Serial.println( F( "[tempReadAndSend] failed reading temperature from DHT" ));
+    } else if( cur_temp != last_temp ){
+        last_temp = cur_temp;
+        changed = true;
     }
 
-    return( changed );
-}
-
-void sendTemp( void )
-{
-    msg.clear();
-    send( msg.setSensor( CHILD_ID_TEMPERATURE ).setType( V_TEMP ).set( st_temp, 1 ));
-    st_temp_mf_timer.restart();
-    st_temp_unchanged_timer.restart();
-
+    if( changed || forceSend ){
+        msg.clear();
+        send( msg.setSensor( CHILD_ID_TEMPERATURE ).setType( V_TEMP ).set( last_temp, 1 ));
+        st_temp_unchanged_timer.restart();
 #ifdef DEBUG_ENABLED
-    Serial.print( F( "[sendTemp] temp=" ));
-    Serial.print( st_temp );
-    Serial.println( F( "°C" ));
+        Serial.print( F( "[tempReadAndSend] forceSend=" ));
+        Serial.print( forceSend ? "True":"False" );
+        Serial.print( F( ", changed=" ));
+        Serial.print( changed ? "True":"False" );
+        Serial.print( F( ", temp=" ));
+        Serial.print( last_temp );
+        Serial.println( F( "°C" ));
 #endif
+    }
 }
 
-void onTempUnchangedCb( void *empty )
+void tempOnMaxFrequencyCb( void *empty )
 {
-    sendTemp();
+    tempReadAndSend( false );
 }
 
-bool readHum( void )
+void tempOnUnchangedCb( void *empty )
 {
+    tempReadAndSend( true );
+}
+
+/* Read the humidity as a float.
+ * If changed or @forceSend is %true, then send the humidity value to the controller.
+ */
+void humReadAndSend( bool forceSend )
+{
+    static float last_hum = 0.0;
     bool changed = false;
 
-    if( !st_hum_mf_timer.isStarted()){
-        float prev_hum = st_hum;
-        // Get temperature from DHT library
-        float hum = dht.getHumidity();
-        if( isnan( hum )){
-            Serial.println( F( "[readTemp] failed reading humidity from DHT" ));
-        } else {
-            st_hum = hum;
-            changed |= ( prev_hum != st_hum );
-        }
+    // Get temperature from DHT library
+    float cur_hum = dht.getHumidity();
+    if( isnan( cur_hum )){
+        Serial.println( F( "[humReadAndSend] failed reading humidity from DHT" ));
+    } else if( cur_hum != last_hum ){
+        last_hum = cur_hum;
+        changed = true;
     }
 
-    return( changed );
-}
-
-void sendHum( void )
-{
-    msg.clear();
-    send( msg.setSensor( CHILD_ID_HUMIDITY ).setType( V_HUM ).set( st_hum, 1 ));
-    st_hum_mf_timer.restart();
-    st_hum_unchanged_timer.restart();
-
+    if( changed || forceSend ){
+        msg.clear();
+        send( msg.setSensor( CHILD_ID_HUMIDITY ).setType( V_HUM ).set( last_hum, 1 ));
+        st_hum_unchanged_timer.restart();
 #ifdef DEBUG_ENABLED
-    Serial.print( F( "[sendHum] hum=" ));
-    Serial.print( st_hum );
-    Serial.println( F( "%" ));
+        Serial.print( F( "[humReadAndSend] forceSend=" ));
+        Serial.print( forceSend ? "True":"False" );
+        Serial.print( F( ", changed=" ));
+        Serial.print( changed ? "True":"False" );
+        Serial.print( F( ", hum=" ));
+        Serial.print( last_hum );
+        Serial.println( F( "%" ));
 #endif
+    }
 }
 
-void onHumUnchangedCb( void *empty )
+void humOnMaxFrequencyCb( void *empty )
 {
-    sendHum();
+    humReadAndSend( false );
+}
+
+void humOnUnchangedCb( void *empty )
+{
+    humReadAndSend( true );
 }
 
 /*
@@ -380,39 +450,44 @@ void onHumUnchangedCb( void *empty )
 #define OPENING_INPUT           (A0)           // use analog pin as a digital input
 #define OPENING_LED             (A1)
 
+pwiTimer st_door_alert_timer;
 pwiTimer st_door_unchanged_timer;
-bool st_opened = false;
 
-bool readDoor( void  )
+void doorReadAndSend( bool forceSend )
 {
+    static bool last_opened = false;
     bool changed = false;
-    bool prev_opened = st_opened;
-    st_opened = ( digitalRead( OPENING_INPUT ) == HIGH );
-    if( st_opened != prev_opened ){
+
+    bool cur_opened = ( digitalRead( OPENING_INPUT ) == HIGH );
+    if( cur_opened != last_opened ){
+        last_opened = cur_opened;
         changed = true;
-        digitalWrite( OPENING_LED, st_opened ? HIGH : LOW );
+        digitalWrite( OPENING_LED, last_opened ? HIGH:LOW );
+    }
+
+    if( changed || forceSend ){
+        msg.clear();
+        send( msg.setSensor( CHILD_ID_DOOR ).setType( V_TRIPPED ).set( last_opened ));
+        st_door_unchanged_timer.restart();
 #ifdef DEBUG_ENABLED
-        Serial.print( F( "[readDoor] opened=" ));
-        Serial.println( st_opened ? "True":"False" );
+        Serial.print( F( "[doorReadAndSend] forceSend=" ));
+        Serial.print( forceSend ? "True":"False" );
+        Serial.print( F( ", changed=" ));
+        Serial.print( changed ? "True":"False" );
+        Serial.print( F( ", opened=" ));
+        Serial.println( last_opened ? "True":"False" );
 #endif
     }
-    return( changed );
 }
 
-void sendDoor( void )
+void doorOnAlertCb( void *empty )
 {
-    msg.clear();
-    send( msg.setSensor( CHILD_ID_DOOR ).setType( V_TRIPPED ).set( st_opened ));
-    st_door_unchanged_timer.restart();
-#ifdef DEBUG_ENABLED
-    Serial.print( F( "[sendDoor] opened=" ));
-    Serial.println( st_opened ? "True":"False" );
-#endif
+    doorReadAndSend( false );
 }
 
-void onDoorUnchangedCb( void *empty )
+void doorOnUnchangedCb( void *empty )
 {
-    sendDoor();
+    doorReadAndSend( true );
 }
 
 /* **************************************************************************************
@@ -424,8 +499,14 @@ void presentation()
     Serial.println( F( "[presentation]" ));
 #endif
     sendSketchInfo( thisSketchName, thisSketchVersion );
-    present( CHILD_MAIN, S_CUSTOM );
-    present( CHILD_ID_FLOOD,       S_WATER_LEAK, "Flood detection" );
+    present( CHILD_MAIN_0,         S_CUSTOM,     "General Commands Target" );
+    present( CHILD_MAIN_1,         S_CUSTOM,     "UnchangedTimeout" );
+    present( CHILD_MAIN_2,         S_CUSTOM,     "AlarmsReactionTime" );
+    present( CHILD_ID_FLOOD_0,     S_CUSTOM,     "Flood Commands Target" );
+    present( CHILD_ID_FLOOD_1,     S_WATER_LEAK, "Flood detection armed (current status)" );
+    present( CHILD_ID_FLOOD_2,     S_WATER_LEAK, "Flood detected" );
+    present( CHILD_ID_FLOOD_3,     S_WATER_LEAK, "RearmDelay" );
+    present( CHILD_ID_FLOOD_4,     S_WATER_LEAK, "RemainingDelayBeforeRearm" );
     present( CHILD_ID_RAIN,        S_RAIN,       "Rain sensor" );
     present( CHILD_ID_TEMPERATURE, S_TEMP,       "Temperature measure" );
     present( CHILD_ID_HUMIDITY,    S_HUM,        "Humidity measure" );
@@ -434,8 +515,6 @@ void presentation()
 
 void setup()  
 {
-    static pwiTimer main_timer;
-    
 #ifdef DEBUG_ENABLED
     Serial.begin( 115200 );
     Serial.println( F( "[setup]" ));
@@ -449,64 +528,41 @@ void setup()
     digitalWrite( FLOOD_ARMED_LED, LOW );
     pinMode( FLOOD_ARMED_LED, OUTPUT );
 
-    st_flood_unchanged_timer.set( "RainFloodUnchangedTimer", eeprom.unchanged_timeout, false, onFloodUnchangedCb );
-    st_flood_rearm_timer.set( "RainFloodRearmTimer", eeprom.flood_rearm_delay, true, onFloodRearmCb );
-    floodSetArmed( eeprom.flood_armed, false );
+    st_flood_remaining_timer.set( "FloodRemainingTimer", eeprom.max_frequency_timeout, false, floodOnRemainingCb );
+    st_flood_alert_timer.start( "FloodAlertTimer", eeprom.alert_timeout, false, floodOnAlertCb, NULL, false );
+    st_flood_unchanged_timer.set( "FloodUnchangedTimer", eeprom.unchanged_timeout, false, floodOnUnchangedCb );
+    st_flood_rearm_timer.set( "FloodRearmTimer", eeprom.flood_rearm_delay, true, floodOnRearmCb );
+    floodSetArmed( eeprom.flood_armed, false, false );
 
-    st_rain_mf_timer.set( "RainRateMaxFrequencyTimer", eeprom.max_frequency_timeout, true );
+    st_rain_mf_timer.start( "RainRateMaxFrequencyTimer", eeprom.max_frequency_timeout, false, rainOnMaxFrequencyCb );
     st_rain_unchanged_timer.set( "RainRateUnchangedTimer", eeprom.unchanged_timeout, false, onRainUnchangedCb );
 
     // temperature/humidity
     dht.setup( TEMPHUM_DIGITALINPUT, DHT::AM2302 ); 
 
-    st_temp_mf_timer.set( "TempMaxFrequencyTimer", eeprom.max_frequency_timeout, true );
-    st_temp_unchanged_timer.set( "TempUnchangedTimer", eeprom.unchanged_timeout, false, onTempUnchangedCb );
+    st_temp_mf_timer.start( "TempMaxFrequencyTimer", eeprom.max_frequency_timeout, false, tempOnMaxFrequencyCb );
+    st_temp_unchanged_timer.set( "TempUnchangedTimer", eeprom.unchanged_timeout, false, tempOnUnchangedCb );
 
-    st_hum_mf_timer.set( "HumidityMaxFrequencyTimer", eeprom.max_frequency_timeout, true );
-    st_hum_unchanged_timer.set( "HumidityUnchangedTimer", eeprom.unchanged_timeout, false, onHumUnchangedCb );
+    st_hum_mf_timer.start( "HumidityMaxFrequencyTimer", eeprom.max_frequency_timeout, false, humOnMaxFrequencyCb );
+    st_hum_unchanged_timer.set( "HumidityUnchangedTimer", eeprom.unchanged_timeout, false, humOnUnchangedCb );
 
     // opening door
     pinMode( OPENING_INPUT, INPUT );
     digitalWrite( OPENING_LED, LOW );
     pinMode( OPENING_LED, OUTPUT );
 
-    st_door_unchanged_timer.set( "DoorUnchangedTimer", eeprom.unchanged_timeout, false, onDoorUnchangedCb );
-
-    // main timer
-    main_timer.start( "MainTimer", st_main_timeout, false, MainLoopCb, NULL, false );
+    st_door_alert_timer.start( "DoorAlertTimer", eeprom.alert_timeout, false, doorOnAlertCb, NULL, false );
+    st_door_unchanged_timer.set( "DoorUnchangedTimer", eeprom.unchanged_timeout, false, doorOnUnchangedCb );
     
     pwiTimer::Dump();
+
+    // send all informations a first time
+    dumpConfiguration();
 }
 
 void loop()
 {
     pwiTimer::Loop();
-}
-
-/* **************************************************************************************
- *  MainLoopCb
- *  Is called on each timeout of the main_timer (setup to 250ms)
- *  Take the measure, and send if changed
- *  - each measure has its own 'max_frequency' timer which prevents it to be sent too often
- *  - alarms are sent as soon as they are detected.
- */
-void MainLoopCb( void *empty )
-{
-    if( readRain()){
-        sendRain();
-    }
-    if( readTemp()){
-        sendTemp();
-    }
-    if( readHum()){
-        sendHum();
-    }
-    if( readFlood()){
-        sendFlood();
-    }
-    if( readDoor()){
-        sendDoor();
-    }
 }
 
 /* **************************************************************************************
@@ -527,24 +583,28 @@ void receive(const MyMessage &message)
 #endif
 
     switch( message.sensor ){
-        case CHILD_MAIN:
-            switch( message.type ){
-                case V_CUSTOM:
-                    switch( cmd ){
-                        case C_SET:
+        case CHILD_MAIN_0:
+            switch( cmd ){
+                case C_SET:
+                    switch( message.type ){
+                        case V_CUSTOM:
                             req = strlen( payload ) > 0 ? atoi( payload ) : 0;
                             switch( req ){
                                 case 1:
+                                    eeprom_reset( eeprom );
+                                    break;
+                                case 2:
                                     ulong = strlen( payload ) > 2 ? atol( payload+2 ) : 0;
                                     if( ulong > 0 ){
                                         eeprom.max_frequency_timeout = ulong;
                                         eeprom_write( eeprom );
+                                        st_flood_remaining_timer.setDelay( ulong );
                                         st_rain_mf_timer.setDelay( ulong );
                                         st_temp_mf_timer.setDelay( ulong );
                                         st_hum_mf_timer.setDelay( ulong );
                                     }
                                     break;
-                                case 2:
+                                case 3:
                                     ulong = strlen( payload ) > 2 ? atol( payload+2 ) : 0;
                                     if( ulong > 0 ){
                                         eeprom.unchanged_timeout = ulong;
@@ -556,12 +616,22 @@ void receive(const MyMessage &message)
                                         st_door_unchanged_timer.setDelay( ulong );
                                     }
                                     break;
-                                case 3:
-                                    eeprom_reset( eeprom );
+                                case 4:
+                                    ulong = strlen( payload ) > 2 ? atol( payload+2 ) : 0;
+                                    if( ulong > 0 ){
+                                        eeprom.alert_timeout = ulong;
+                                        eeprom_write( eeprom );
+                                        st_flood_alert_timer.setDelay( ulong );
+                                        st_door_alert_timer.setDelay( ulong );
+                                    }
                                     break;
                             }
                             break;
-                        case C_REQ:
+                    }
+                    break;
+                case C_REQ:
+                    switch( message.type ){
+                        case V_CUSTOM:
                             req = strlen( payload ) > 0 ? atoi( payload ) : 0;
                             switch( req ){
                                 case 1:
@@ -573,20 +643,15 @@ void receive(const MyMessage &message)
                     break;
             }
             break;
-            
-        case CHILD_ID_FLOOD:
-            switch( message.type ){
-                case V_ARMED:
-                    switch( cmd ){
-                        case C_SET:
+        case CHILD_ID_FLOOD_0:
+            switch( cmd ){
+                case C_SET:
+                    switch( message.type ){
+                        case V_ARMED:
                             entier = strlen( payload ) > 0 ? atoi( payload ) : 0;
                             floodSetArmed( entier > 0 );
                             break;
-                    }
-                    break;
-                case V_CUSTOM:
-                    switch( cmd ){
-                        case C_SET:
+                        case V_CUSTOM:
                             req = strlen( payload ) > 0 ? atoi( payload ) : 0;
                             switch( req ){
                                 case 1:
@@ -600,30 +665,30 @@ void receive(const MyMessage &message)
                             }
                             break;
                     }
-                    break;
             }
-            break;
     }
 }
 
 void dumpConfiguration( void )
 {
+    // send global configuration
     msg.clear();
-    send( msg.setSensor( CHILD_MAIN ).setType( V_VAR1 ).set( eeprom.max_frequency_timeout ));
+    send( msg.setSensor( CHILD_MAIN_0 ).setType( V_VAR1 ).set( eeprom.max_frequency_timeout ));
     msg.clear();
-    send( msg.setSensor( CHILD_MAIN ).setType( V_VAR2 ).set( eeprom.unchanged_timeout ));
-    sendFloodArmed();
-    if( eeprom.flood_armed ){
-        sendFlood();
-    }
+    send( msg.setSensor( CHILD_MAIN_1 ).setType( V_VAR1 ).set( eeprom.unchanged_timeout ));
     msg.clear();
-    send( msg.setSensor( CHILD_ID_FLOOD ).setType( V_VAR1 ).set( eeprom.flood_rearm_delay ));
+    send( msg.setSensor( CHILD_MAIN_2 ).setType( V_VAR1 ).set( eeprom.alert_timeout ));
+
+    // send sensors status
+    floodSendArmed();
+    floodReadAndSend( true );
     msg.clear();
-    send( msg.setSensor( CHILD_ID_FLOOD ).setType( V_VAR2 ).set( st_flood_armed ));
-    sendRain();
-    sendTemp();
-    sendHum();
-    sendDoor();
+    send( msg.setSensor( CHILD_ID_FLOOD_3 ).setType( V_VAR1 ).set( eeprom.flood_rearm_delay ));
+
+    rainReadAndSend( true );
+    tempReadAndSend( true );
+    humReadAndSend( true );
+    doorReadAndSend( true );
 }
 
 /**
@@ -636,6 +701,7 @@ void eeprom_dump( sEeprom &sdata )
 {
 #ifdef EEPROM_DEBUG
     Serial.print( F( "[eeprom_dump] mark='" )); Serial.print( sdata.mark ); Serial.println( "'" );
+    Serial.print( F( "[eeprom_dump] alert_timeout=" )); Serial.println( sdata.alert_timeout );
     Serial.print( F( "[eeprom_dump] max_frequency_timeout=" )); Serial.println( sdata.max_frequency_timeout );
     Serial.print( F( "[eeprom_dump] unchanged_timeout=" )); Serial.println( sdata.unchanged_timeout );
     Serial.print( F( "[eeprom_dump] flood_armed=" )); Serial.println( sdata.flood_armed ? "True":"False" );
@@ -680,6 +746,7 @@ void eeprom_reset( sEeprom &sdata )
 #endif
     memset( &sdata, '\0', sizeof( sdata ));
     strcpy( sdata.mark, "PWI" );
+    sdata.alert_timeout = def_alert_timeout;
     sdata.max_frequency_timeout = def_max_frequency_timeout;
     sdata.unchanged_timeout = def_unchanged_timeout;
     sdata.flood_armed = true;

@@ -157,36 +157,45 @@ http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-netwo
  Interactions
  ============
 
- The MySensors node present one main ID to the controller, to manage global
- actions and request or set global parameters.
-
- Each sensor presents its own ID.
+ Starting with v6.1.2017, this MySensors node presents one ID for each
+ message sent to the controller.
 
  Below interactions are seen from MySensors node point of view.
 
- - CHILD_MAIN (S_CUSTOM)
+ - CHILD_MAIN_0 (S_CUSTOM)
    Present the node to the controller, and let us manage global actions.
     |
     +- Received from controller
     |   |
     |   +- C_SET
     |   |   |
-    |   |   +- V_CUSTOM with payload = '1=<value>': set the measures max frequency (default is 2mn - ms).
-    |   |   +- V_CUSTOM with payload = '2=<value>': set the unchanged timeout (default is 1h - ms).
-    |   |   |                                       this concerns both alarms and measures.
-    |   |   +- V_CUSTOM with payload = '3': reset the Eeprom to default values
+    |   |   +- V_CUSTOM with payload = '1': reset the Eeprom to default values
+    |   |   +- V_CUSTOM with payload = '2=<value>': set the measures max frequency (default is 2mn - ms).
+    |   |   +- V_CUSTOM with payload = '3=<value>': set the measures/alarms unchanged timeout (default is 1h - ms).
+    |   |   +- V_CUSTOM with payload = '4=<value>': set the flood/door alarms reaction time (default is 250 ms).
     |   |
     |   +- C_REQ
     |       |
     |       +- V_CUSTOM with payload = '1': request a configuration dump;
     |                                       send the configuration parameters along with the current value of each sensors.
     |
-    +- Sent to controller
+    +- Sent to controller (as C_SET messages)
         |
-        +- V_VAR1: measures max frequency (ms) in response to CHILD_MAIN:C_REQ:V_CUSTOM:payload=1.
-        +- V_VAR2: unchanged timeout (ms) in response to CHILD_MAIN:C_REQ:V_CUSTOM:payload=1.
+        +- V_VAR1: measures max frequency (ms).
 
- - CHILD_FLOOD (S_WATER_LEAK)
+ - CHILD_MAIN_1 (S_CUSTOM)
+    |
+    +- Sent to controller (as C_SET messages)
+        |
+        +- V_VAR1: unchanged timeout (ms).
+
+ - CHILD_MAIN_2 (S_CUSTOM)
+    |
+    +- Sent to controller (as C_SET messages)
+        |
+        +- V_VAR1: alarms reaction time (ms).
+
+ - CHILD_FLOOD_0 (S_CUSTOM)
    This is the digital part of the rain sensor, used as boolean flooding sensor.
     |
     +- Received from controller
@@ -196,39 +205,64 @@ http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-netwo
     |       +- V_ARMED with payload = '1|0': arms (resp. unarms) the flood sensor (permanent status).
     |       +- V_CUSTOM with payload = '1=<value>': set the automatic rearm delay (default is 12h - ms).
     |
-    +- Sent to controller
+    +- Sent to controller (as C_SET messages)
         |
-        +- V_ARMED: whether the flood sensor is armed (permanent status).
+        +- V_VAR1: whether the flood sensor is armed (permanent status).
+
+ - CHILD_FLOOD_1 (S_WATER_LEAK)
+   This is the digital part of the rain sensor, used as boolean flooding sensor.
+    |
+    +- Sent to controller (as C_SET messages)
+        |
+        +- V_VAR1: whether the flood sensor is armed (current status).
+
+ - CHILD_FLOOD_2 (S_WATER_LEAK)
+   This is the digital part of the rain sensor, used as boolean flooding sensor.
+    |
+    +- Sent to controller (as C_SET messages)
+        |
         +- V_TRIPPED: whether a flooding is detected.
-        +- V_VAR1: automatic rearm delay (ms) in response to CHILD_MAIN:C_REQ:V_CUSTOM:payload=1.
-        +- V_VAR2: whether the flood sensor is armed (current status).
+
+ - CHILD_FLOOD_3 (S_WATER_LEAK)
+   This is the digital part of the rain sensor, used as boolean flooding sensor.
+    |
+    +- Sent to controller (as C_SET messages)
+        |
+        +- V_VAR1: automatic rearm delay (ms).
+
+ - CHILD_FLOOD_4 (S_WATER_LEAK)
+   This is the digital part of the rain sensor, used as boolean flooding sensor.
+    |
+    +- Sent to controller (as C_SET messages)
+        |
+        +- V_VAR1: (starting with 6.1) the remaining delay until the alarm is rearmed after a flood has been detected (ms).
 
  - CHILD_RAIN (S_RAIN)
    This is the analog part of the rain sensor, used as analog flooding sensor for debounce estimations.
     |
-    +- Sent to controller
+    +- Sent to controller (as C_SET messages)
         |
         +- V_RAIN: (starting with 5.2) humidity rate from 0 (flood) to 1023 (dry)
 
  - CHILD_TEMPERATURE (S_TEMP)
     |
-    +- Sent to controller
+    +- Sent to controller (as C_SET messages)
         |
         +- V_TEMP: temperature (°C)
 
  - CHILD_HUMIDITY (S_HUM)
     |
-    +- Sent to controller
+    +- Sent to controller (as C_SET messages)
         |
         +- V_HUM: humidity (%)
 
  - CHILD_OPENING (S_DOOR)
     |
-    +- Sent to controller
+    +- Sent to controller (as C_SET messages)
         |
         +- V_TRIPPED: whether the door is opened (or closed)
 
 -----------------------------------------------------------------------
- P. Wieser - Created on 2017, may 2nd.
-             Last updated on 2017, may, 12th
+ P. Wieser - Created on 2017, may 2nd
+             Last updated on 2017, may, 23rd.
 
