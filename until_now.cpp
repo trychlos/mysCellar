@@ -1,5 +1,9 @@
 #include "until_now.h"
 
+/*
+ * pwi 2017- 5- 2 v1 creation
+ */
+
 #define UNTIL_NOW_MAX_ULONG 4294967295 /* overflow every 49 days */
 
 /**

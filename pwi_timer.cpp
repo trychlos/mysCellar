@@ -1,8 +1,12 @@
 #include "pwi_timer.h"
 #include "until_now.h"
 
+/*
+ * pwi 2017- 5-20 v3 add getRemaining() method
+ */
+
 // uncomment to debugging this file
-#define TIMER_DEBUG
+//#define TIMER_DEBUG
 
 // max count of allocatable pwiTimer's
 #define PWITIMER_MAX 15
@@ -230,7 +234,7 @@ void pwiTimer::objDump( uint8_t idx )
  * pwiTimer::objLoop:
  * 
  * If the timer is started, and has expired, then call the callback. 
- * Stop the timer is set for running once.
+ * Stop the timer if set for running once.
  * 
  * Private
  */
