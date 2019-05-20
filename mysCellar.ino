@@ -103,9 +103,11 @@
  *                  review the messaging vision to have one child per information message
  *                  remove the pwiAlarm class (no grace delay) to take place in the Nano
  *                  use patched MySensors 2.1.1 to publish the library version
+ * pwi 2019- 5-19 v7.2-2019
+ *                  fix lighting of flood armed LED ar startup
  *
-  Sketch uses 27940 bytes (90%) of program storage space. Maximum is 30720 bytes.
-  Global variables use 1785 bytes (87%) of dynamic memory, leaving 263 bytes for local variables. Maximum is 2048 bytes.
+  Sketch uses 28142 bytes (91%) of program storage space. Maximum is 30720 bytes.
+  Global variables use 1794 bytes (87%) of dynamic memory, leaving 254 bytes for local variables. Maximum is 2048 bytes.
  */
 
 // uncomment for debugging this sketch
@@ -115,7 +117,7 @@
 #define EEPROM_DEBUG
 
 static const char * const thisSketchName    = "mysCellar";
-static const char * const thisSketchVersion = "7.1-2019";
+static const char * const thisSketchVersion = "7.2-2019";
 
 /*
  * The current configuration
@@ -234,12 +236,13 @@ void floodPresentation()
 
 void floodSetup()  
 {
-    digitalWrite( FLOOD_TRIPPED_LED, LOW );
-    pinMode( FLOOD_TRIPPED_LED, OUTPUT );
     digitalWrite( FLOOD_ARMED_LED, LOW );
     pinMode( FLOOD_ARMED_LED, OUTPUT );
+    digitalWrite( FLOOD_TRIPPED_LED, LOW );
+    pinMode( FLOOD_TRIPPED_LED, OUTPUT );
 
     flood_sensor.setup( eeprom.flood_unchanged_timeout, eeprom.flood_max_frequency_timeout, floodMeasureCb, floodSendCb );
+    floodSetArmed( eeprom.flood_armed );
 }
 
 /* Regarding the flood detection, we are only interested by the digital value
@@ -265,6 +268,14 @@ void floodSendCb( void *user_data )
     send( msg.setSensor( CHILD_ID_FLOOD ).setType( V_ARMED ).set( eeprom.flood_armed ));
     msg.clear();
     send( msg.setSensor( CHILD_ID_FLOOD+1 ).setType( V_TRIPPED ).set( flood_tripped ));
+}
+
+void floodSetArmed( bool armed )
+{
+    eeprom.flood_armed = armed;
+    eepromWrite( eeprom );
+    digitalWrite( FLOOD_ARMED_LED, eeprom.flood_armed ? HIGH:LOW );
+    floodSetTripped( false );
 }
 
 /* Set the tripped status of the flood detection.
@@ -304,14 +315,6 @@ void floodSendUnchangedTimeout()
 {
     msg.clear();
     send( msg.setSensor( CHILD_ID_FLOOD+3 ).setType( V_VAR2 ).set( eeprom.flood_unchanged_timeout ));
-}
-
-void floodSetArmed( bool armed )
-{
-    eeprom.flood_armed = armed;
-    eepromWrite( eeprom );
-    digitalWrite( FLOOD_ARMED_LED, eeprom.flood_armed ? HIGH:LOW );
-    floodSetTripped( false );
 }
 
 #ifdef ALARM_GRACE_DELAY

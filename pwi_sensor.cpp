@@ -3,6 +3,7 @@
  * pwi 2019- 5-18 v1 creation
  * pwi 2019- 5-19 v2 add debug messages
  *                   fix MySensors present() scope
+ * pwi 2019- 5-20 v3 stop the timers on unarming
  */
 
 #include <core/MySensorsCore.h>
@@ -90,6 +91,10 @@ void pwiSensor::present( uint8_t id, uint8_t type, const char *label )
 void pwiSensor::setArmed( bool armed )
 {
     this->armed = armed;
+    if( !armed ){
+        this->min_timer.stop();
+        this->max_timer.stop();
+    }
 }
 
 /**
@@ -203,9 +208,11 @@ void pwiSensor::onMaxPeriodCb( pwiSensor *node )
     Serial.print( F( "[pwiSensor::onMaxPeriodCb] node_id=" ));
     Serial.println( node->getId());
 #endif
-    if( node->sendCb ){
-        node->sendCb( node->user_data );
-        node->max_timer.restart();
+    if( node->armed ){
+        if( node->sendCb ){
+            node->sendCb( node->user_data );
+            node->max_timer.restart();
+        }
     }
 }
 
