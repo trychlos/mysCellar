@@ -162,105 +162,47 @@ http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-netwo
 
  Below interactions are seen from MySensors node point of view.
 
- - CHILD_MAIN_0 (S_CUSTOM)
-   Present the node to the controller, and let us manage global actions.
-    |
-    +- Received from controller
-    |   |
-    |   +- C_SET
-    |   |   |
-    |   |   +- V_CUSTOM with payload = '1': reset the Eeprom to default values
-    |   |   +- V_CUSTOM with payload = '2=<value>': set the measures max frequency (default is 2mn - ms).
-    |   |   +- V_CUSTOM with payload = '3=<value>': set the measures/alarms unchanged timeout (default is 1h - ms).
-    |   |   +- V_CUSTOM with payload = '4=<value>': set the flood/door alarms reaction time (default is 250 ms).
-    |   |
-    |   +- C_REQ
-    |       |
-    |       +- V_CUSTOM with payload = '1': request a configuration dump;
-    |                                       send the configuration parameters along with the current value of each sensors.
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_VAR1: measures max frequency (ms).
+ Cf. original in build/Sheet.ods
 
- - CHILD_MAIN_1 (S_CUSTOM)
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_VAR1: unchanged timeout (ms).
+      Sens  Name                  Id  Type          Nature  Command Message  Payload     Comment
+      
+      In  CHILD_MAIN               1  S_CUSTOM      Action  C_REQ  V_CUSTOM  1           reset EEPROM to default values
+      In  CHILD_MAIN               1  S_CUSTOM      Action  C_REQ  V_CUSTOM  2           dump full configuration and status, all current infos are sent
+      In  CHILD_MAIN               1  S_CUSTOM      Action  C_SET  V_CUSTOM  3=<ms>      set periodic resend of the full configuration ; 0 to disable ; default=86400000 (24h)
+      Out CHILD_MAIN               1  S_CUSTOM      Info           V_VAR1    <ms>        periodic resend period of the full configuration
 
- - CHILD_MAIN_2 (S_CUSTOM)
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_VAR1: alarms reaction time (ms).
+      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
+      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET  V_CUSTOM  ARM=1|0     arm/unarm the sensor
+      Out CHILD_ID_FLOOD          10  S_WATER_LEAK  Info           V_ARMED   true|false  whether the flood alarm is armed
+      Out CHILD_ID_FLOOD+1        11  S_WATER_LEAK  Info           V_TRIPPED true|false  whether the flood alarm is tripped (false if not armed)
+      Out CHILD_ID_FLOOD+2        12  S_WATER_LEAK  Info           V_VAR1    <ms>        current max send frequency for the flood alarm
+      Out CHILD_ID_FLOOD+3        13  S_WATER_LEAK  Info           V_VAR2    <ms>        current unchanged send timeout for the flood alarm
 
- - CHILD_FLOOD_0 (S_CUSTOM)
-   This is the digital part of the rain sensor, used as boolean flooding sensor.
-    |
-    +- Received from controller
-    |   |
-    |   +- C_SET
-    |       |
-    |       +- V_ARMED with payload = '1|0': arms (resp. unarms) the flood sensor (permanent status).
-    |       +- V_CUSTOM with payload = '1=<value>': set the automatic rearm delay (default is 12h - ms).
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_VAR1: whether the flood sensor is armed (permanent status).
+      In  CHILD_ID_RAIN           20  S_RAIN        Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
+      In  CHILD_ID_RAIN           20  S_RAIN        Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_RAIN           20  S_RAIN        Info           V_RAIN    <num>       rain analogic value in [0..1024]
+      Out CHILD_ID_RAIN+1         21  S_RAIN        Info           V_VAR1    <ms>        current max send frequency for rain
+      Out CHILD_ID_RAIN+2         22  S_RAIN        Info           V_VAR2    <ms>        current unchanged send timeout for rain
+ 
+      In  CHILD_ID_TEMPERATURE    30  S_TEMP        Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
+      In  CHILD_ID_TEMPERATURE    30  S_TEMP        Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_TEMPERATURE    30  S_TEMP        Info           V_TEMP    <num>       temperature
+      Out CHILD_ID_TEMPERATURE+1  31  S_TEMP        Info           V_VAR1    <ms>        current max send frequency for temperature
+      Out CHILD_ID_TEMPERATURE+2  32  S_TEMP        Info           V_VAR2    <ms>        current unchanged send timeout for temperature
 
- - CHILD_FLOOD_1 (S_WATER_LEAK)
-   This is the digital part of the rain sensor, used as boolean flooding sensor.
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_VAR1: whether the flood sensor is armed (current status).
+      In  CHILD_ID_HUMIDITY       40  S_HUM         Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
+      In  CHILD_ID_HUMIDITY       40  S_HUM         Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_HUMIDITY       40  S_HUM         Info           V_HUM     <num>       humidity
+      Out CHILD_ID_HUMIDITY+1     41  S_HUM         Info           V_VAR1    <ms>        current max send frequency for humidity
+      Out CHILD_ID_HUMIDITY+2     42  S_HUM         Info           V_VAR2    <ms>        current unchanged send timeout for humidity
 
- - CHILD_FLOOD_2 (S_WATER_LEAK)
-   This is the digital part of the rain sensor, used as boolean flooding sensor.
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_TRIPPED: whether a flooding is detected.
-
- - CHILD_FLOOD_3 (S_WATER_LEAK)
-   This is the digital part of the rain sensor, used as boolean flooding sensor.
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_VAR1: automatic rearm delay (ms).
-
- - CHILD_FLOOD_4 (S_WATER_LEAK)
-   This is the digital part of the rain sensor, used as boolean flooding sensor.
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_VAR1: (starting with 6.1) the remaining delay until the alarm is rearmed after a flood has been detected (ms).
-
- - CHILD_RAIN (S_RAIN)
-   This is the analog part of the rain sensor, used as analog flooding sensor for debounce estimations.
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_RAIN: (starting with 5.2) humidity rate from 0 (flood) to 1023 (dry)
-
- - CHILD_TEMPERATURE (S_TEMP)
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_TEMP: temperature (°C)
-
- - CHILD_HUMIDITY (S_HUM)
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_HUM: humidity (%)
-
- - CHILD_OPENING (S_DOOR)
-    |
-    +- Sent to controller (as C_SET messages)
-        |
-        +- V_TRIPPED: whether the door is opened (or closed)
+      In  CHILD_ID_DOOR           50  S_DOOR        Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
+      In  CHILD_ID_DOOR           50  S_DOOR        Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_DOOR           50  S_DOOR        Info           V_ARMED   true|false  whether the door opening detection is armed
+      Out CHILD_ID_DOOR+1         51  S_DOOR        Info           V_TRIPPED true|false  whether the door is opened (false if not armed)
+      Out CHILD_ID_DOOR+2         52  S_DOOR        Info           V_VAR1    <ms>        current max send frequency for door opening detection
+      Out CHILD_ID_DOOR+3         53  S_DOOR        Info           V_VAR2    <ms>        current unchanged send timeout for door opening detection
 
 -----------------------------------------------------------------------
  P. Wieser - Created on 2017, may 2nd
