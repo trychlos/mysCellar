@@ -10,21 +10,7 @@
  Todo
  ====
 
-   3 2019- 5-16 review messages so that all actions/configurations are on child 0
-				all status come from one child per capteur with different messages
-                cf. next_version
-
-   4 2019- 5-16 version scheme should be x.y.z-yyyy
-
-   5 2019- 5-16 send library version at setup
-
-   6 2019- 5-16 make sure each configuration change send the new value as an ack
-
-   7 2019- 5-16 make sure it is relevant to distinguish arm_current_status vs. arm_eeprom
-
-   8 2019- 5-16 keep the lights on even if the door is closed ?
-
-   9
+  10
 
 -----------------------------------------------------------------------
  Done
@@ -38,6 +24,32 @@
                 (probably while it is drying) - and then stays blocked
                 on 'on' state
      2017- 5-12 fixed
+
+   3 2019- 5-16 review messages so that all actions/configurations are on child 0
+				all status come from one child per capteur with different messages
+     2019- 5-20 for 7.1-2019 version:
+                - child MAIN is n° 1 : only manages global, node-level, actions
+                  this is an action-only node, which does not present any information
+                  by itself, and thus, is not presented to the controller
+                - infos children are numbered 20, 30..
+
+   4 2019- 5-16 version scheme should be x.y.z-yyyy
+     2019- 5-20 done with 7.0-2019 version
+
+   5 2019- 5-16 send library version at setup
+     2019- 5-20 done for 7.1-2019 version
+
+   6 2019- 5-16 make sure each configuration change send the new value as an ack
+     2019- 5-20 done for 7.1-2019 version
+
+   7 2019- 5-16 make sure it is relevant to distinguish arm_current_status vs. arm_eeprom
+     2019- 5-20 no more considered as relevant as of 7.1-2019 version
+
+   8 2019- 5-16 keep the lights on even if the door is closed ?
+     2019- 5-20 no more understand the point - cancelled
+
+   9 2019- 5-20 periodically re-send the full configuration
+     2019- 5-25 done in v7.3-2019
 
 -----------------------------------------------------------------------
  P. Wieser - Created on 2017, apr. 2nd

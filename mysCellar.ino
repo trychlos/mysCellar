@@ -47,43 +47,45 @@
  *
  *    cf. original in build/Sheet.ods
  *
-      Sens  Name                  Id  Type          Nature  Command Message Payload     Comment
+      Sens  Name                  Id  Type          Nature  Command Message  Payload     Comment
       
-      In  CHILD_MAIN               1  S_CUSTOM      Action  C_REQ V_CUSTOM  1           reset EEPROM to default values
-      In  CHILD_MAIN               1  S_CUSTOM      Action  C_REQ V_CUSTOM  2           dump full configuration and status, all current infos are sent
+      In  CHILD_MAIN               1  S_CUSTOM      Action  C_REQ  V_CUSTOM  1           reset EEPROM to default values
+      In  CHILD_MAIN               1  S_CUSTOM      Action  C_REQ  V_CUSTOM  2           dump full configuration and status, all current infos are sent
+      In  CHILD_MAIN               1  S_CUSTOM      Action  C_SET  V_CUSTOM  3=<ms>      set periodic resend of the full configuration ; 0 to disable ; default=86400000 (24h)
+      Out CHILD_MAIN               1  S_CUSTOM      Info           V_VAR1    <ms>        periodic resend period of the full configuration
 
-      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
-      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET V_CUSTOM  ARM=1|0     arm/unarm the sensor
-      Out CHILD_ID_FLOOD          10  S_WATER_LEAK  Info          V_ARMED   true|false  whether the flood alarm is armed
-      Out CHILD_ID_FLOOD+1        11  S_WATER_LEAK  Info          V_TRIPPED true|false  whether the flood alarm is tripped (false if not armed)
-      Out CHILD_ID_FLOOD+2        12  S_WATER_LEAK  Info          V_VAR1    <ms>        current max send frequency for the flood alarm
-      Out CHILD_ID_FLOOD+3        13  S_WATER_LEAK  Info          V_VAR2    <ms>        current unchanged send timeout for the flood alarm
+      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
+      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET  V_CUSTOM  ARM=1|0     arm/unarm the sensor
+      Out CHILD_ID_FLOOD          10  S_WATER_LEAK  Info           V_ARMED   true|false  whether the flood alarm is armed
+      Out CHILD_ID_FLOOD+1        11  S_WATER_LEAK  Info           V_TRIPPED true|false  whether the flood alarm is tripped (false if not armed)
+      Out CHILD_ID_FLOOD+2        12  S_WATER_LEAK  Info           V_VAR1    <ms>        current max send frequency for the flood alarm
+      Out CHILD_ID_FLOOD+3        13  S_WATER_LEAK  Info           V_VAR2    <ms>        current unchanged send timeout for the flood alarm
 
-      In  CHILD_ID_RAIN           20  S_RAIN        Action  C_SET V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      In  CHILD_ID_RAIN           20  S_RAIN        Action  C_SET V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
-      Out CHILD_ID_RAIN           20  S_RAIN        Info          V_RAIN    <num>       rain analogic value in [0..1024]
-      Out CHILD_ID_RAIN+1         21  S_RAIN        Info          V_VAR1    <ms>        current max send frequency for rain
-      Out CHILD_ID_RAIN+2         22  S_RAIN        Info          V_VAR2    <ms>        current unchanged send timeout for rain
+      In  CHILD_ID_RAIN           20  S_RAIN        Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
+      In  CHILD_ID_RAIN           20  S_RAIN        Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_RAIN           20  S_RAIN        Info           V_RAIN    <num>       rain analogic value in [0..1024]
+      Out CHILD_ID_RAIN+1         21  S_RAIN        Info           V_VAR1    <ms>        current max send frequency for rain
+      Out CHILD_ID_RAIN+2         22  S_RAIN        Info           V_VAR2    <ms>        current unchanged send timeout for rain
  
-      In  CHILD_ID_TEMPERATURE    30  S_TEMP        Action  C_SET V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      In  CHILD_ID_TEMPERATURE    30  S_TEMP        Action  C_SET V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
-      Out CHILD_ID_TEMPERATURE    30  S_TEMP        Info          V_TEMP    <num>       temperature
-      Out CHILD_ID_TEMPERATURE+1  31  S_TEMP        Info          V_VAR1    <ms>        current max send frequency for temperature
-      Out CHILD_ID_TEMPERATURE+2  32  S_TEMP        Info          V_VAR2    <ms>        current unchanged send timeout for temperature
+      In  CHILD_ID_TEMPERATURE    30  S_TEMP        Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
+      In  CHILD_ID_TEMPERATURE    30  S_TEMP        Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_TEMPERATURE    30  S_TEMP        Info           V_TEMP    <num>       temperature
+      Out CHILD_ID_TEMPERATURE+1  31  S_TEMP        Info           V_VAR1    <ms>        current max send frequency for temperature
+      Out CHILD_ID_TEMPERATURE+2  32  S_TEMP        Info           V_VAR2    <ms>        current unchanged send timeout for temperature
 
-      In  CHILD_ID_HUMIDITY       40  S_HUM         Action  C_SET V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      In  CHILD_ID_HUMIDITY       40  S_HUM         Action  C_SET V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
-      Out CHILD_ID_HUMIDITY       40  S_HUM         Info          V_HUM     <num>       humidity
-      Out CHILD_ID_HUMIDITY+1     41  S_HUM         Info          V_VAR1    <ms>        current max send frequency for humidity
-      Out CHILD_ID_HUMIDITY+2     42  S_HUM         Info          V_VAR2    <ms>        current unchanged send timeout for humidity
+      In  CHILD_ID_HUMIDITY       40  S_HUM         Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
+      In  CHILD_ID_HUMIDITY       40  S_HUM         Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_HUMIDITY       40  S_HUM         Info           V_HUM     <num>       humidity
+      Out CHILD_ID_HUMIDITY+1     41  S_HUM         Info           V_VAR1    <ms>        current max send frequency for humidity
+      Out CHILD_ID_HUMIDITY+2     42  S_HUM         Info           V_VAR2    <ms>        current unchanged send timeout for humidity
 
-      In  CHILD_ID_DOOR           50  S_DOOR        Action  C_SET V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      In  CHILD_ID_DOOR           50  S_DOOR        Action  C_SET V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
-      Out CHILD_ID_DOOR           50  S_DOOR        Info          V_ARMED   true|false  whether the door opening detection is armed
-      Out CHILD_ID_DOOR+1         51  S_DOOR        Info          V_TRIPPED true|false  whether the door is opened (false if not armed)
-      Out CHILD_ID_DOOR+2         52  S_DOOR        Info          V_VAR1    <ms>        current max send frequency for door opening detection
-      Out CHILD_ID_DOOR+3         53  S_DOOR        Info          V_VAR2    <ms>        current unchanged send timeout for door opening detection
+      In  CHILD_ID_DOOR           50  S_DOOR        Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
+      In  CHILD_ID_DOOR           50  S_DOOR        Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_DOOR           50  S_DOOR        Info           V_ARMED   true|false  whether the door opening detection is armed
+      Out CHILD_ID_DOOR+1         51  S_DOOR        Info           V_TRIPPED true|false  whether the door is opened (false if not armed)
+      Out CHILD_ID_DOOR+2         52  S_DOOR        Info           V_VAR1    <ms>        current max send frequency for door opening detection
+      Out CHILD_ID_DOOR+3         53  S_DOOR        Info           V_VAR2    <ms>        current unchanged send timeout for door opening detection
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -104,10 +106,13 @@
  *                  remove the pwiAlarm class (no grace delay) to take place in the Nano
  *                  use patched MySensors 2.1.1 to publish the library version
  * pwi 2019- 5-19 v7.2-2019
- *                  fix lighting of flood armed LED ar startup
+ *                  fix lighting of flood armed LED at startup
+ * pwi 2019- 5-25 v7.3-2019
+ *                  auto-send the full configuration
+ *                  numeric measures are not compared by float, but rather by int
  *
-  Sketch uses 28142 bytes (91%) of program storage space. Maximum is 30720 bytes.
-  Global variables use 1794 bytes (87%) of dynamic memory, leaving 254 bytes for local variables. Maximum is 2048 bytes.
+  Sketch uses 28550 bytes (92%) of program storage space. Maximum is 30720 bytes.
+  Global variables use 1798 bytes (87%) of dynamic memory, leaving 250 bytes for local variables. Maximum is 2048 bytes.
  */
 
 // uncomment for debugging this sketch
@@ -117,7 +122,7 @@
 #define EEPROM_DEBUG
 
 static const char * const thisSketchName    = "mysCellar";
-static const char * const thisSketchVersion = "7.2-2019";
+static const char * const thisSketchVersion = "7.3-2019";
 
 /*
  * The current configuration
@@ -149,26 +154,23 @@ typedef struct {
     unsigned long door_unchanged_timeout;
     unsigned long door_grace_delay;
     unsigned long door_advert_period;
+    /* autosend the full configuration */
+    unsigned long auto_full_config_timeout;
 }
   sEeprom;
 
 sEeprom eeprom;
-  
-static unsigned long def_max_frequency_timeout = 120000;        // 2 mn
-static unsigned long def_unchanged_timeout = 3600000;           // 1 h
-static unsigned long def_grace_delay = 0;
-static unsigned long def_advert_period = 0;
 
 /* The MySensors part */
 #define MY_NODE_ID 4
 #define MY_DEBUG
 #define MY_REPEATER_FEATURE
 #define MY_RADIO_NRF24
-#define MY_RF24_CHANNEL 103
-#define MY_RF24_PA_LEVEL RF24_PA_MIN
+#define MY_RF24_PA_LEVEL RF24_PA_HIGH
 #define MY_SIGNING_SOFT
 #define MY_SIGNING_SOFT_RANDOMSEED_PIN 7
-#define MY_SOFT_HMAC_KEY 0xe5,0xc5,0x36,0xd8,0x4b,0x45,0x49,0x25,0xaa,0x54,0x3b,0xcc,0xf4,0xcb,0xbb,0xb7,0x77,0xa4,0x80,0xae,0x83,0x75,0x40,0xc2,0xb1,0xcb,0x72,0x50,0xaa,0x8a,0xf1,0x6d
+#include <pwi_myrf24.h>
+#include <pwi_myhmac.h>
 #include <MySensors.h>
 
 /* The four sensors + the main one
@@ -243,6 +245,7 @@ void floodSetup()
 
     flood_sensor.setup( eeprom.flood_unchanged_timeout, eeprom.flood_max_frequency_timeout, floodMeasureCb, floodSendCb );
     floodSetArmed( eeprom.flood_armed );
+    flood_sensor.trigger();
 }
 
 /* Regarding the flood detection, we are only interested by the digital value
@@ -272,10 +275,13 @@ void floodSendCb( void *user_data )
 
 void floodSetArmed( bool armed )
 {
-    eeprom.flood_armed = armed;
-    eepromWrite( eeprom );
+    bool changed = ( eeprom.flood_armed != armed );
+    if( changed ){
+        eeprom.flood_armed = armed;
+        eepromWrite( eeprom );
+        floodSetTripped( false );
+    }
     digitalWrite( FLOOD_ARMED_LED, eeprom.flood_armed ? HIGH:LOW );
-    floodSetTripped( false );
 }
 
 /* Set the tripped status of the flood detection.
@@ -404,6 +410,7 @@ void rainPresentation()
 void rainSetup()  
 {
     rain_sensor.setup( eeprom.rain_unchanged_timeout, eeprom.rain_max_frequency_timeout, rainMeasureCb, rainSendCb );
+    rain_sensor.trigger();
 }
 
 bool rainMeasureCb( void *user_data )
@@ -501,7 +508,7 @@ bool tempMeasureCb( void *user_data=NULL );
 void tempSendCb( void *user_data=NULL );
 
 pwiSensor temp_sensor;
-float     temp_last = 0.0;
+int       temp_last = 0;    // store the temperature multiplied by 10
 
 void tempPresentation()  
 {
@@ -519,6 +526,7 @@ void tempSetup()
     dht.setup( TEMPHUM_DIGITALINPUT, DHT::AM2302 ); 
 
     temp_sensor.setup( eeprom.temp_unchanged_timeout, eeprom.temp_max_frequency_timeout, tempMeasureCb, tempSendCb );
+    temp_sensor.trigger();
 }
 
 bool tempMeasureCb( void *user_data )
@@ -526,12 +534,15 @@ bool tempMeasureCb( void *user_data )
     bool changed = false;
 
     // Get temperature from DHT library
-    float cur_temp = dht.getTemperature();
-    if( isnan( cur_temp )){
-        Serial.println( F( "[tempOnMeasureCb] failed reading temperature from DHT" ));
-    } else if( cur_temp != temp_last ){
-        temp_last = cur_temp;
-        changed = true;
+    float ftemp = dht.getTemperature();
+    if( isnan( ftemp )){
+        Serial.println( F( "[tempMeasureCb] failed reading temperature from DHT" ));
+    } else {
+        int itemp = (int) 10*ftemp;
+        if( itemp != temp_last ){
+            temp_last = itemp;
+            changed = true;
+        }
     }
 
     return( changed );
@@ -539,11 +550,12 @@ bool tempMeasureCb( void *user_data )
 
 void tempSendCb( void *user_data )
 {
+    float ftemp = temp_last / 10;
     msg.clear();
-    send( msg.setSensor( CHILD_ID_TEMPERATURE ).setType( V_TEMP ).set( temp_last, 1 ));
+    send( msg.setSensor( CHILD_ID_TEMPERATURE ).setType( V_TEMP ).set( ftemp, 1 ));
 #ifdef DEBUG_ENABLED
     Serial.print( F( "[tempSendCb] temp=" ));
-    Serial.print( temp_last,1 );
+    Serial.print( ftemp,1 );
     Serial.println( F( "°C" ));
 #endif
 }
@@ -598,7 +610,7 @@ bool humMeasureCb( void *user_data=NULL );
 void humSendCb( void *user_data=NULL );
 
 pwiSensor hum_sensor;
-float     hum_last = 0.0;
+int       hum_last = 0;   // store the measure multiplied by 10
 
 void humPresentation()  
 {
@@ -610,6 +622,7 @@ void humPresentation()
 void humSetup()  
 {
     hum_sensor.setup( eeprom.hum_unchanged_timeout, eeprom.hum_max_frequency_timeout, humMeasureCb, humSendCb );
+    hum_sensor.trigger();
 }
 
 bool humMeasureCb( void *user_data )
@@ -617,12 +630,15 @@ bool humMeasureCb( void *user_data )
     bool changed = false;
 
     // Get temperature from DHT library
-    float cur_hum = dht.getHumidity();
-    if( isnan( cur_hum )){
+    float fhum = dht.getHumidity();
+    if( isnan( fhum )){
         Serial.println( F( "[humMeasureCb] failed reading humidity from DHT" ));
-    } else if( cur_hum != hum_last ){
-        hum_last = cur_hum;
-        changed = true;
+    } else {
+        int ihum = ( int ) 10*fhum;
+        if( ihum != hum_last ){
+            hum_last = ihum;
+            changed = true;
+        }
     }
 
     return( changed );
@@ -630,11 +646,12 @@ bool humMeasureCb( void *user_data )
 
 void humSendCb( void *user_data )
 {
+    float fhum = hum_last / 10 ;
     msg.clear();
-    send( msg.setSensor( CHILD_ID_HUMIDITY ).setType( V_HUM ).set( hum_last, 1 ));
+    send( msg.setSensor( CHILD_ID_HUMIDITY ).setType( V_HUM ).set( fhum, 1 ));
 #ifdef DEBUG_ENABLED
     Serial.print( F( "[humSendCb] humidity=" ));
-    Serial.print( hum_last, 1 );
+    Serial.print( fhum, 1 );
     Serial.println( F( "%" ));
 #endif
 }
@@ -719,6 +736,7 @@ void doorSetup()
     pinMode( OPENING_LED, OUTPUT );
 
     door_sensor.setup( eeprom.door_unchanged_timeout, eeprom.door_max_frequency_timeout, doorMeasureCb, doorSendCb );
+    door_sensor.trigger();
 }
 
 bool doorMeasureCb( void *user_data )
@@ -858,8 +876,7 @@ void presentation()
     sendSketchInfo( thisSketchName, thisSketchVersion );
 
     // sensors presentation
-    // do not present the action-only sensor
-    //present( CHILD_MAIN, S_CUSTOM, "Commands Target" );
+    present( CHILD_MAIN, S_CUSTOM );
     floodPresentation();
     rainPresentation();
     tempPresentation();
@@ -875,6 +892,7 @@ void setup()
 #endif
 
     eepromRead( eeprom );
+
     floodSetup();
     rainSetup();
     tempSetup();
@@ -893,6 +911,30 @@ void setup()
 void loop()
 {
     pwiTimer::Loop();
+}
+
+void mainSendTimeout()
+{
+    msg.clear();
+    send( msg.setSensor( CHILD_MAIN ).setType( V_VAR1 ).set( eeprom.auto_full_config_timeout ));
+}
+
+void mainSetTimeout( unsigned long ms )
+{
+    eeprom.auto_full_config_timeout = ms;
+    eepromWrite( eeprom );
+    mainSendTimeout();
+}
+
+void mainReceive( const char *payload )
+{
+    uint8_t ureq = strlen( payload ) > 0 ? atoi( payload ) : 0;
+    unsigned long ulong = strlen( payload ) > 2 ? atol( payload+2 ) : 0;
+    switch( ureq ){
+        case 3:
+            mainSetTimeout( ulong );
+            break;
+    }
 }
 
 /* **************************************************************************************
@@ -930,6 +972,9 @@ void receive(const MyMessage &message)
 
     if( cmd == C_SET ){
         switch( message.sensor ){
+            case CHILD_MAIN:
+                mainReceive( payload );
+                break;
             case CHILD_ID_FLOOD:
                 floodReceive( payload );
                 break;
@@ -951,6 +996,8 @@ void receive(const MyMessage &message)
 
 void dumpConfiguration( void )
 {
+    mainSendTimeout();
+
     floodSendCb();
     floodSendMaxFrequency();
     floodSendUnchangedTimeout();
@@ -960,17 +1007,14 @@ void dumpConfiguration( void )
     floodSendRemainingDelay();
 #endif
 
-    rainMeasureCb();
     rainSendCb();
     rainSendMaxFrequency();
     rainSendUnchangedTimeout();
 
-    tempMeasureCb();
     tempSendCb();
     tempSendMaxFrequency();
     tempSendUnchangedTimeout();
 
-    humMeasureCb();
     humSendCb();
     humSendMaxFrequency();
     humSendUnchangedTimeout();
@@ -1011,6 +1055,7 @@ void eepromDump( sEeprom &sdata )
     Serial.print( F( "[eepromDump] door_unchanged_timeout=" ));      Serial.println( sdata.door_unchanged_timeout );
     Serial.print( F( "[eepromDump] door_grace_delay=" ));            Serial.println( sdata.door_grace_delay );
     Serial.print( F( "[eepromDump] door_advert_period=" ));          Serial.println( sdata.door_advert_period );
+    Serial.print( F( "[eepromDump] auto_full_config_timeout=" ));    Serial.println( sdata.auto_full_config_timeout );
 #endif
 }
 
@@ -1046,27 +1091,37 @@ void eepromRead( sEeprom &sdata )
  */
 void eepromReset( sEeprom &sdata )
 {
+    unsigned long def_max_frequency_timeout = 120000;        // 2 mn
+    unsigned long def_unchanged_timeout = 3600000;           // 1 h
 #ifdef EEPROM_DEBUG
     Serial.println( F( "[eepromReset]" ));
 #endif
     memset( &sdata, '\0', sizeof( sdata ));
     strcpy( sdata.mark, "PWI" );
+
     sdata.flood_armed = true;
     sdata.flood_max_frequency_timeout = def_max_frequency_timeout;
     sdata.flood_unchanged_timeout = def_unchanged_timeout;
-    sdata.flood_grace_delay = def_grace_delay;
-    sdata.flood_advert_period = def_advert_period;
+    sdata.flood_grace_delay = 0;
+    sdata.flood_advert_period = 0;
+
     sdata.rain_max_frequency_timeout = def_max_frequency_timeout;
     sdata.rain_unchanged_timeout = def_unchanged_timeout;
+
     sdata.temp_max_frequency_timeout = def_max_frequency_timeout;
     sdata.temp_unchanged_timeout = def_unchanged_timeout;
+
     sdata.hum_max_frequency_timeout = def_max_frequency_timeout;
     sdata.hum_unchanged_timeout = def_unchanged_timeout;
+
     sdata.door_armed = true;
-    sdata.door_max_frequency_timeout = def_max_frequency_timeout;
+    sdata.door_max_frequency_timeout = 200;
     sdata.door_unchanged_timeout = def_unchanged_timeout;
-    sdata.door_grace_delay = def_grace_delay;
-    sdata.door_advert_period = def_advert_period;
+    sdata.door_grace_delay = 0;
+    sdata.door_advert_period = 0;
+
+    sdata.auto_full_config_timeout = 86400000;              // 24h
+
     eepromWrite( sdata );
 }
 
