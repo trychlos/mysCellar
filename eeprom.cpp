@@ -97,6 +97,9 @@ void eepromReset( sEeprom &data, pEepromWrite pfnWrite )
  */
 void eepromWrite( sEeprom &data, pEepromWrite pfnWrite )
 {
+#ifdef EEPROM_DEBUG
+    Serial.println( F( "[eepromWrite]" ));
+#endif
     for( uint8_t i=0 ; i<sizeof( sEeprom ); ++i ){
         pfnWrite( i, (( uint8_t * ) &data )[i] );
     }

@@ -113,16 +113,18 @@
                     review the sensors node ids
                     fix the temperature and hygrometry measures
                     add a version number if the EEPROM structure
+   pwi 2019- 6- 1 v7.4.1-2019
+                    fix weird behavior of switch statement
 
-  Sketch uses 27388 bytes (89%) of program storage space. Maximum is 30720 bytes.
-  Global variables use 1667 bytes (81%) of dynamic memory, leaving 381 bytes for local variables. Maximum is 2048 bytes.
+  Sketch uses 28392 bytes (92%) of program storage space. Maximum is 30720 bytes.
+  Global variables use 1673 bytes (81%) of dynamic memory, leaving 375 bytes for local variables. Maximum is 2048 bytes.
 */
 
 // uncomment for debugging this sketch
 #define DEBUG_ENABLED
 
 static const char * const thisSketchName    = "mysCellar";
-static const char * const thisSketchVersion = "7.4-2019";
+static const char * const thisSketchVersion = "7.4.1-2019";
 
 /* The MySensors part */
 #define MY_NODE_ID 4
@@ -625,11 +627,11 @@ void doorPresentation()
     present( CHILD_ID_DOOR+1, S_DOOR, "Door alarm tripped" );
     present( CHILD_ID_DOOR+2, S_DOOR, "Door min period" );
     present( CHILD_ID_DOOR+3, S_DOOR, "Door max period" );
-  #ifdef ALARM_GRACE_DELAY
+#ifdef ALARM_GRACE_DELAY
     present( CHILD_ID_DOOR+4, S_DOOR, "Door grace delay" );
     present( CHILD_ID_DOOR+5, S_DOOR, "Door advertising period" );
     present( CHILD_ID_DOOR+6, S_DOOR, "Door remaining grace delay" );
-  #endif
+#endif
 }
 
 void doorSetup()
@@ -745,12 +747,27 @@ void doorSendRemainingDelay()
 
 void mainAutoDumpSend()
 {
+    uint8_t sensor_id = CHILD_MAIN+1;
+    uint8_t msg_type = V_VAR1;
+    unsigned long payload = eeprom.auto_dump_timeout;
+#ifdef DEBUG_ENABLED
+    Serial.print( F( "[mainAutoDumpSend] sensor=" ));
+    Serial.print( sensor_id );
+    Serial.print( F( ", type=" ));
+    Serial.print( msg_type );
+    Serial.print( F( ", payload='" ));
+    Serial.println( payload );
+#endif
     msg.clear();
-    send( msg.setSensor( CHILD_MAIN+1 ).setType( V_VAR1 ).set( eeprom.auto_dump_timeout ));
+    send( msg.setSensor( sensor_id ).setType( msg_type ).set( payload ));
 }
 
 void mainAutoDumpSet( unsigned long ms )
 {
+#ifdef DEBUG_ENABLED
+    Serial.print( F( "[mainAutoDumpSet] ms=" ));
+    Serial.println( ms );
+#endif
     eeprom.auto_dump_timeout = ms;
     eepromWrite( eeprom, saveState );
 }
@@ -807,88 +824,106 @@ void loop()
 
 void receive(const MyMessage &message)
 {
-    // all received messages should be V_CUSTOM
-    if( message.type != V_CUSTOM ){
-        return;
-    }
+    uint8_t cmd = message.getCommand();
 
     char payload[MAX_PAYLOAD+1];
     memset( payload, '\0', sizeof( payload ));
     message.getString( payload );
-#ifdef HAVE_DEBUG
-    Serial.print( F( "receive() payload='" )); Serial.print( payload ); Serial.println( "'" );
+
+#ifdef DEBUG_ENABLED
+    Serial.print( F( "[receive] sensor=" ));
+    Serial.print( message.sensor );
+    Serial.print( F( ", type=" ));
+    Serial.print( message.type );
+    Serial.print( F( ", cmd=" ));
+    Serial.print( cmd );
+    Serial.print( F( ", payload='" ));
+    Serial.print( payload );
+    Serial.println( F( "'" ));
 #endif
 
-    uint8_t cmd = message.getCommand();
+    // all received messages should be V_CUSTOM
+    if( message.type != V_CUSTOM ){
+#ifdef DEBUG_ENABLED
+        Serial.println( F( "[receive] message cancelled as should be V_CUSTOM" ));
+#endif
+        return;
+    }
 
-    switch( cmd ){
-        case C_REQ:
-            uint8_t ureq = strlen( payload ) > 0 ? atoi( payload ) : 0;
-            switch( message.sensor ){
-                case CHILD_MAIN:
-                    switch ( ureq ) {
-                      case 1:
-                          eepromReset( eeprom, saveState );
-                          break;
-                      case 2:
-                          dumpData();
-                          break;
-                    }
-                    break;
-            }
-            break;
-        case C_SET:
-            unsigned long ulong = strlen( payload ) > 0 ? atol( payload ) : 0;
-            switch( message.sensor ){
-                case CHILD_MAIN+1:
-                    mainAutoDumpSet( ulong );
-                    mainAutoDumpSend();
-                    break;
-                case CHILD_ID_FLOOD:
-                    floodArmedSet( payload );
-                    break;
-                case CHILD_ID_FLOOD+2:
-                    floodMinPeriodSet( ulong );
-                    floodMinPeriodSend();
-                    break;
-                case CHILD_ID_FLOOD+3:
-                    floodMaxPeriodSet( ulong );
-                    floodMaxPeriodSend();
-                    break;
-                case CHILD_ID_RAIN+1:
-                    rainMinPeriodSet( ulong );
-                    rainMinPeriodSend();
-                    break;
-                case CHILD_ID_RAIN+2:
-                    rainMaxPeriodSet( ulong );
-                    rainMaxPeriodSend();
-                    break;
-                case CHILD_ID_TEMPERATURE+1:
-                    tempMinPeriodSet( ulong );
-                    tempMinPeriodSend();
-                    break;
-                case CHILD_ID_TEMPERATURE+2:
-                    tempMaxPeriodSet( ulong );
-                    tempMaxPeriodSend();
-                    break;
-                case CHILD_ID_HUMIDITY+1:
-                    humMinPeriodSet( ulong );
-                    humMinPeriodSend();
-                    break;
-                case CHILD_ID_HUMIDITY+2:
-                    humMaxPeriodSet( ulong );
-                    humMaxPeriodSend();
-                    break;
-                case CHILD_ID_DOOR+2:
-                    doorMinPeriodSet( ulong );
-                    doorMinPeriodSend();
-                    break;
-                case CHILD_ID_DOOR+3:
-                    doorMaxPeriodSet( ulong );
-                    doorMaxPeriodSend();
-                    break;
-            }
-            break;
+    if( cmd == C_REQ ){
+          uint8_t ureq = strlen( payload ) > 0 ? atoi( payload ) : 0;
+#ifdef DEBUG_ENABLED
+          Serial.print( F( "[receive] C_REQ: ureq=" ));
+          Serial.println( ureq );
+#endif
+          switch( message.sensor ){
+              case CHILD_MAIN:
+                  switch ( ureq ) {
+                    case 1:
+                        eepromReset( eeprom, saveState );
+                        break;
+                    case 2:
+                        dumpData();
+                        break;
+                  }
+                  break;
+          }
+
+    } else if( cmd == C_SET ){
+        unsigned long ulong = strlen( payload ) > 0 ? atol( payload ) : 0;
+#ifdef DEBUG_ENABLED
+        Serial.print( F( "[receive] C_SET: ulong=" ));
+        Serial.println( ulong );
+#endif
+        switch( message.sensor ){
+            case CHILD_MAIN+1:
+                mainAutoDumpSet( ulong );
+                mainAutoDumpSend();
+                break;
+            case CHILD_ID_FLOOD:
+                floodArmedSet( payload );
+                break;
+            case CHILD_ID_FLOOD+2:
+                floodMinPeriodSet( ulong );
+                floodMinPeriodSend();
+                break;
+            case CHILD_ID_FLOOD+3:
+                floodMaxPeriodSet( ulong );
+                floodMaxPeriodSend();
+                break;
+            case CHILD_ID_RAIN+1:
+                rainMinPeriodSet( ulong );
+                rainMinPeriodSend();
+                break;
+            case CHILD_ID_RAIN+2:
+                rainMaxPeriodSet( ulong );
+                rainMaxPeriodSend();
+                break;
+            case CHILD_ID_TEMPERATURE+1:
+                tempMinPeriodSet( ulong );
+                tempMinPeriodSend();
+                break;
+            case CHILD_ID_TEMPERATURE+2:
+                tempMaxPeriodSet( ulong );
+                tempMaxPeriodSend();
+                break;
+            case CHILD_ID_HUMIDITY+1:
+                humMinPeriodSet( ulong );
+                humMinPeriodSend();
+                break;
+            case CHILD_ID_HUMIDITY+2:
+                humMaxPeriodSet( ulong );
+                humMaxPeriodSend();
+                break;
+            case CHILD_ID_DOOR+2:
+                doorMinPeriodSet( ulong );
+                doorMinPeriodSend();
+                break;
+            case CHILD_ID_DOOR+3:
+                doorMaxPeriodSet( ulong );
+                doorMaxPeriodSend();
+                break;
+        }
     }
 }
 
