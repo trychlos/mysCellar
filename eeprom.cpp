@@ -17,7 +17,7 @@ void eepromDump( sEeprom &data )
 {
 #ifdef EEPROM_DEBUG
     Serial.print( F( "[eepromDump] mark='" ));                       Serial.print( data.mark ); Serial.println( F( "'" ));
-    Serial.print( F( "[eepromDump] version='" ));                    Serial.println( data.version );
+    Serial.print( F( "[eepromDump] version=" ));                     Serial.println( data.version );
     Serial.print( F( "[eepromDump] flood_armed=" ));                 Serial.println( data.flood_armed ? "True" : "False" );
     Serial.print( F( "[eepromDump] flood_max_frequency_timeout=" )); Serial.println( data.flood_max_frequency_timeout );
     Serial.print( F( "[eepromDump] flood_unchanged_timeout=" ));     Serial.println( data.flood_unchanged_timeout );

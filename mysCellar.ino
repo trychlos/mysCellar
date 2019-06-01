@@ -117,16 +117,18 @@
                     fix weird behavior of switch statement
    pwi 2019- 6- 1 v7.4.2-2019
                     fix unexpected automatic creation of a surnumerous sensor in Jeedom
+   pwi 2019- 6- 1 v7.5-2019
+                    implement periodic auto dump
 
-  Sketch uses 28408 bytes (92%) of program storage space. Maximum is 30720 bytes.
-  Global variables use 1693 bytes (82%) of dynamic memory, leaving 355 bytes for local variables. Maximum is 2048 bytes.
+  Sketch uses 28522 bytes (92%) of program storage space. Maximum is 30720 bytes.
+  Global variables use 1721 bytes (84%) of dynamic memory, leaving 327 bytes for local variables. Maximum is 2048 bytes.
 */
 
 // uncomment for debugging this sketch
 #define DEBUG_ENABLED
 
 static const char * const thisSketchName    = "mysCellar";
-static const char * const thisSketchVersion = "7.4.2-2019";
+static const char * const thisSketchVersion = "7.5-2019";
 
 /* The MySensors part */
 #define MY_NODE_ID 4
@@ -157,13 +159,14 @@ enum {
 MyMessage msg;
 
 /*
-   Declare our classes
-*/
+ * Declare our classes
+ */
 #include <pwiSensor.h>
 #include <pwiTimer.h>
 #include "eeprom.h"
 
 sEeprom eeprom;
+pwiTimer autodump_timer;
 
 /* ****************************************************************************
    Flood detection is provided by a rain sensor which itself provides
@@ -747,9 +750,22 @@ void doorSendRemainingDelay()
  *  mainSensor
  */
 
+void mainAutoDumpCb( void*empty );
+
 void mainPresentation()
 {
     present( CHILD_MAIN+1, S_CUSTOM, "Data periodic dump" );
+}
+
+void mainSetup()
+{
+    autodump_timer.setup( "AutoDumpTimer", eeprom.auto_dump_timeout, false, ( pwiTimerCb ) mainAutoDumpCb );
+    autodump_timer.start();
+}
+
+void mainAutoDumpCb( void*empty )
+{
+    dumpData();
 }
 
 void mainAutoDumpSend()
@@ -762,7 +778,7 @@ void mainAutoDumpSend()
     Serial.print( sensor_id );
     Serial.print( F( ", type=" ));
     Serial.print( msg_type );
-    Serial.print( F( ", payload='" ));
+    Serial.print( F( ", payload=" ));
     Serial.println( payload );
 #endif
     msg.clear();
@@ -816,6 +832,7 @@ void setup()
     eepromRead( eeprom, loadState, saveState );
     eepromDump( eeprom );
 
+    mainSetup();
     floodSetup();
     rainSetup();
     tempSetup();
