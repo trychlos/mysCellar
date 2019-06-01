@@ -162,49 +162,49 @@ http://fr.aliexpress.com/item/Free-shipping-W5100-Ethernet-module-Ethernet-netwo
 
  Below interactions are seen from MySensors node point of view.
 
- Cf. original in build/Sheet.ods
+ Cf. original (and source and reference) in build/Sheets.ods
 
       Sens  Name                  Id  Type          Nature  Command Message  Payload     Comment
       
       In  CHILD_MAIN               1  S_CUSTOM      Action  C_REQ  V_CUSTOM  1           reset EEPROM to default values
       In  CHILD_MAIN               1  S_CUSTOM      Action  C_REQ  V_CUSTOM  2           dump full configuration and status, all current infos are sent
-      In  CHILD_MAIN               1  S_CUSTOM      Action  C_SET  V_CUSTOM  3=<ms>      set periodic resend of the full configuration ; 0 to disable ; default=86400000 (24h)
-      Out CHILD_MAIN               1  S_CUSTOM      Info           V_VAR1    <ms>        periodic resend period of the full configuration
+      In  CHILD_MAIN+1             2  S_CUSTOM      Action  C_SET  V_CUSTOM  <ms>        set periodic resend of the full configuration ; 0 to disable ; default=86400000 (24h)
+      Out CHILD_MAIN+1             2  S_CUSTOM      Info           V_VAR1    <ms>        periodic resend period of the full configuration
 
-      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
       In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET  V_CUSTOM  ARM=1|0     arm/unarm the sensor
       Out CHILD_ID_FLOOD          10  S_WATER_LEAK  Info           V_ARMED   true|false  whether the flood alarm is armed
       Out CHILD_ID_FLOOD+1        11  S_WATER_LEAK  Info           V_TRIPPED true|false  whether the flood alarm is tripped (false if not armed)
+      In  CHILD_ID_FLOOD+2        12  S_WATER_LEAK  Action  C_SET  V_CUSTOM  <ms>        set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
       Out CHILD_ID_FLOOD+2        12  S_WATER_LEAK  Info           V_VAR1    <ms>        current max send frequency for the flood alarm
-      Out CHILD_ID_FLOOD+3        13  S_WATER_LEAK  Info           V_VAR2    <ms>        current unchanged send timeout for the flood alarm
+      In  CHILD_ID_FLOOD+3        13  S_WATER_LEAK  Action  C_SET  V_CUSTOM  <ms>        set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_FLOOD+3        13  S_WATER_LEAK  Info           V_VAR1    <ms>        current unchanged send timeout for the flood alarm
 
-      In  CHILD_ID_RAIN           20  S_RAIN        Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      In  CHILD_ID_RAIN           20  S_RAIN        Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
       Out CHILD_ID_RAIN           20  S_RAIN        Info           V_RAIN    <num>       rain analogic value in [0..1024]
+      In  CHILD_ID_RAIN+1         21  S_RAIN        Action  C_SET  V_CUSTOM  <ms>        set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
       Out CHILD_ID_RAIN+1         21  S_RAIN        Info           V_VAR1    <ms>        current max send frequency for rain
-      Out CHILD_ID_RAIN+2         22  S_RAIN        Info           V_VAR2    <ms>        current unchanged send timeout for rain
+      In  CHILD_ID_RAIN+2         22  S_RAIN        Action  C_SET  V_CUSTOM  <ms>        set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_RAIN+2         22  S_RAIN        Info           V_VAR1    <ms>        current unchanged send timeout for rain
  
-      In  CHILD_ID_TEMPERATURE    30  S_TEMP        Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      In  CHILD_ID_TEMPERATURE    30  S_TEMP        Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
       Out CHILD_ID_TEMPERATURE    30  S_TEMP        Info           V_TEMP    <num>       temperature
+      In  CHILD_ID_TEMPERATURE+1  31  S_TEMP        Action  C_SET  V_CUSTOM  <ms>        set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
       Out CHILD_ID_TEMPERATURE+1  31  S_TEMP        Info           V_VAR1    <ms>        current max send frequency for temperature
-      Out CHILD_ID_TEMPERATURE+2  32  S_TEMP        Info           V_VAR2    <ms>        current unchanged send timeout for temperature
+      In  CHILD_ID_TEMPERATURE+2  32  S_TEMP        Action  C_SET  V_CUSTOM  <ms>        set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_TEMPERATURE+2  32  S_TEMP        Info           V_VAR1    <ms>        current unchanged send timeout for temperature
 
-      In  CHILD_ID_HUMIDITY       40  S_HUM         Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      In  CHILD_ID_HUMIDITY       40  S_HUM         Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
       Out CHILD_ID_HUMIDITY       40  S_HUM         Info           V_HUM     <num>       humidity
+      In  CHILD_ID_HUMIDITY+1     41  S_HUM         Action  C_SET  V_CUSTOM  <ms>        set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
       Out CHILD_ID_HUMIDITY+1     41  S_HUM         Info           V_VAR1    <ms>        current max send frequency for humidity
-      Out CHILD_ID_HUMIDITY+2     42  S_HUM         Info           V_VAR2    <ms>        current unchanged send timeout for humidity
+      In  CHILD_ID_HUMIDITY+2     42  S_HUM         Action  C_SET  V_CUSTOM  <ms>        set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_HUMIDITY+2     42  S_HUM         Info           V_VAR1    <ms>        current unchanged send timeout for humidity
 
-      In  CHILD_ID_DOOR           50  S_DOOR        Action  C_SET  V_CUSTOM  1=<ms>      set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      In  CHILD_ID_DOOR           50  S_DOOR        Action  C_SET  V_CUSTOM  2=<ms>      set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
       Out CHILD_ID_DOOR           50  S_DOOR        Info           V_ARMED   true|false  whether the door opening detection is armed
       Out CHILD_ID_DOOR+1         51  S_DOOR        Info           V_TRIPPED true|false  whether the door is opened (false if not armed)
+      In  CHILD_ID_DOOR+2         52  S_DOOR        Action  C_SET  V_CUSTOM  <ms>        set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
       Out CHILD_ID_DOOR+2         52  S_DOOR        Info           V_VAR1    <ms>        current max send frequency for door opening detection
-      Out CHILD_ID_DOOR+3         53  S_DOOR        Info           V_VAR2    <ms>        current unchanged send timeout for door opening detection
+      In  CHILD_ID_DOOR+3         53  S_DOOR        Action  C_SET  V_CUSTOM  <ms>        set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
+      Out CHILD_ID_DOOR+3         53  S_DOOR        Info           V_VAR1    <ms>        current unchanged send timeout for door opening detection
 
 -----------------------------------------------------------------------
  P. Wieser - Created on 2017, may 2nd
-             Last updated on 2017, may, 23rd.
+             Last updated on 2019, june, 1st.
 
