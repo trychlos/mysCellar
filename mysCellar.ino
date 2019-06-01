@@ -115,16 +115,18 @@
                     add a version number if the EEPROM structure
    pwi 2019- 6- 1 v7.4.1-2019
                     fix weird behavior of switch statement
+   pwi 2019- 6- 1 v7.4.2-2019
+                    fix unexpected automatic creation of a surnumerous sensor in Jeedom
 
-  Sketch uses 28392 bytes (92%) of program storage space. Maximum is 30720 bytes.
-  Global variables use 1673 bytes (81%) of dynamic memory, leaving 375 bytes for local variables. Maximum is 2048 bytes.
+  Sketch uses 28408 bytes (92%) of program storage space. Maximum is 30720 bytes.
+  Global variables use 1693 bytes (82%) of dynamic memory, leaving 355 bytes for local variables. Maximum is 2048 bytes.
 */
 
 // uncomment for debugging this sketch
 #define DEBUG_ENABLED
 
 static const char * const thisSketchName    = "mysCellar";
-static const char * const thisSketchVersion = "7.4.1-2019";
+static const char * const thisSketchVersion = "7.4.2-2019";
 
 /* The MySensors part */
 #define MY_NODE_ID 4
@@ -745,6 +747,11 @@ void doorSendRemainingDelay()
  *  mainSensor
  */
 
+void mainPresentation()
+{
+    present( CHILD_MAIN+1, S_CUSTOM, "Data periodic dump" );
+}
+
 void mainAutoDumpSend()
 {
     uint8_t sensor_id = CHILD_MAIN+1;
@@ -782,11 +789,7 @@ void presentation()
 #ifdef DEBUG_ENABLED
     Serial.println( F( "presentation()" ));
 #endif
-    // sketch presentation
-    sendSketchInfo( thisSketchName, thisSketchVersion );
-
-    // sensors presentation
-    present( CHILD_MAIN+1, S_CUSTOM );
+    mainPresentation();
     floodPresentation();
     rainPresentation();
     tempPresentation();
@@ -800,6 +803,9 @@ void setup()
     Serial.begin( 115200 );
     Serial.println( F( "setup()" ));
 #endif
+
+    // sketch presentation
+    sendSketchInfo( thisSketchName, thisSketchVersion );
 
     // library version
     msg.clear();
