@@ -3,6 +3,7 @@
  Summary
  =======
  
+   Version 7.4-2019
    Version 7.3-2019
    Version 6.1.2017
    Version 6.0.2017
@@ -12,6 +13,25 @@
    Version 4-2017
 
 -----------------------------------------------------------------------
+ Version 7.4-2019
+ ================
+
+ Released on 2019-06-01
+
+ New features and improvements:
+
+   - 
+
+ Bug fixes:
+
+   - Fix float numbers management.
+
+ Other changes:
+
+   - Have eeprom functions in a separate file.
+   - Review parameter management, so that action and info are on the same node.
+
+-----------------------------------------------------------------------
  Version 7.3-2019
  ================
 
@@ -19,7 +39,7 @@
 
  New features and improvements:
 
-   - Perdically re-send the full configuration
+   - Periodically re-send the full configuration
 
  Bug fixes:
 
@@ -146,5 +166,5 @@
 
 -----------------------------------------------------------------------
  P. Wieser - Created on 2017, apr. 2nd
-             Last updated on 2017, may 7th.
+             Last updated on 2019, june, 1st.
 
