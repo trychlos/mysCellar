@@ -117,18 +117,27 @@
                     fix weird behavior of switch statement
    pwi 2019- 6- 1 v7.4.2-2019
                     fix unexpected automatic creation of a surnumerous sensor in Jeedom
+
    pwi 2019- 6- 1 v7.5-2019
                     implement periodic auto dump
-
   Sketch uses 28522 bytes (92%) of program storage space. Maximum is 30720 bytes.
   Global variables use 1721 bytes (84%) of dynamic memory, leaving 327 bytes for local variables. Maximum is 2048 bytes.
+
+   pwi 2019- 9- 8 v7.6-2019
+                    rename Eeprom variables to min_period, max_period
+                    remove alarm test code
+                    update to pwiPrivate 190902
+                    update to pwiCommon 190903
+                    no more use any signing code
+   ketch uses 25904 bytes (84%) of program storage space. Maximum is 30720 bytes.
+Global variables use 892 bytes (43%) of dynamic memory, leaving 1156 bytes for local variables. Maximum is 2048 bytes.
 */
 
 // uncomment for debugging this sketch
 #define DEBUG_ENABLED
 
-static const char * const thisSketchName    = "mysCellar";
-static const char * const thisSketchVersion = "7.5-2019";
+static char const thisSketchName[] PROGMEM    = "mysCellar";
+static char const thisSketchVersion[] PROGMEM = "7.6-2019";
 
 /* The MySensors part */
 #define MY_NODE_ID 4
@@ -136,10 +145,8 @@ static const char * const thisSketchVersion = "7.5-2019";
 #define MY_REPEATER_FEATURE
 #define MY_RADIO_NRF24
 #define MY_RF24_PA_LEVEL RF24_PA_HIGH
-#define MY_SIGNING_SOFT
-#define MY_SIGNING_SOFT_RANDOMSEED_PIN 7
+//#include <pwi_myhmac.h>
 #include <pwi_myrf24.h>
-#include <pwi_myhmac.h>
 #include <MySensors.h>
 
 /* The four sensors + the main one
@@ -175,9 +182,9 @@ pwiTimer autodump_timer;
     - analog value is managed as a standard measure by CHILD_ID_RAIN.
 */
 // rain sensor analog output
-#define FLOOD_ANALOGINPUT       (A7)
-#define FLOOD_ANALOG_MIN        (0)            // flooded
-#define FLOOD_ANALOG_MAX        (1023)         // dry
+#define RAIN_ANALOGINPUT       (A7)
+#define RAIN_ANALOG_MIN        (0)            // flooded
+#define RAIN_ANALOG_MAX        (1023)         // dry
 // rain sensor digital output
 #define FLOOD_DIGITALINPUT      (4)
 #define FLOOD_DIGITAL_FLOODED   (LOW)
@@ -188,26 +195,17 @@ pwiTimer autodump_timer;
 
 bool floodMeasureCb( void *user_data = NULL );
 void floodSendCb( void *user_data = NULL );
-#ifdef ALARM_GRACE_DELAY
-void floodAdvertCb( void *user_data = NULL );
-void floodAlertCb( void *user_data = NULL );
-#endif
 
-pwiSensor flood_sensor;
+pwiSensor flood_sensor( CHILD_ID_FLOOD, FLOOD_DIGITALINPUT);
 bool      flood_tripped = false;
 
 void floodPresentation()
 {
-    flood_sensor.present( CHILD_ID_FLOOD, S_WATER_LEAK, "Flood detection" );
-    //                                        1234567890123456789012345
-    present( CHILD_ID_FLOOD+1, S_WATER_LEAK, "Flood alarm tripped" );
-    present( CHILD_ID_FLOOD+2, S_WATER_LEAK, "Flood min period" );
-    present( CHILD_ID_FLOOD+3, S_WATER_LEAK, "Flood max period" );
-#ifdef ALARM_GRACE_DELAY
-  present( CHILD_ID_FLOOD + 4, S_WATER_LEAK, "Flood detection. Grace delay" );
-  present( CHILD_ID_FLOOD + 5, S_WATER_LEAK, "Flood detection. Advertising period" );
-  present( CHILD_ID_FLOOD + 6, S_WATER_LEAK, "Flood detection. Remaining grace delay" );
-#endif
+    //                                           1234567890123456789012345
+    present( CHILD_ID_FLOOD,   S_WATER_LEAK, F( "Flood detection" ));
+    present( CHILD_ID_FLOOD+1, S_WATER_LEAK, F( "Flood alarm tripped" ));
+    present( CHILD_ID_FLOOD+2, S_WATER_LEAK, F( "Flood min period" ));
+    present( CHILD_ID_FLOOD+3, S_WATER_LEAK, F( "Flood max period" ));
 }
 
 void floodSetup()
@@ -217,9 +215,9 @@ void floodSetup()
     digitalWrite( FLOOD_TRIPPED_LED, LOW );
     pinMode( FLOOD_TRIPPED_LED, OUTPUT );
 
-    flood_sensor.setup( eeprom.flood_unchanged_timeout, eeprom.flood_max_frequency_timeout, floodMeasureCb, floodSendCb );
+    flood_sensor.setup( eeprom.flood_min_period, eeprom.flood_max_period, floodMeasureCb, floodSendCb );
     floodArmedSet( eeprom.flood_armed );
-    flood_sensor.trigger();
+    flood_sensor.measureAndSend();
 }
 
 /* Regarding the flood detection, we are only interested by the digital value
@@ -262,19 +260,26 @@ void floodArmedSet( bool armed )
 
 void floodArmedSet( const char *payload )
 {
-    flood_sensor.setArmed( payload );
-    floodArmedSet( flood_sensor.isArmed());
+    if( strncmp( payload, "ARM=", 4 ) != 0 ){
+        Serial.print( F( "floodArmedSet() payload=" ));
+        Serial.print( payload );
+        Serial.println( F( " invalide; 'ARM=1|0' expected" ));
+        return;
+    }
+    int num = atoi( payload+4 );
+    bool armed = ( num > 0 );
+    floodArmedSet( armed );
 }
 
 void floodMaxPeriodSend()
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_FLOOD+3 ).setType( V_VAR1 ).set( eeprom.flood_unchanged_timeout ));
+    send( msg.setSensor( CHILD_ID_FLOOD+3 ).setType( V_VAR1 ).set( eeprom.flood_max_period ));
 }
 
 void floodMaxPeriodSet( unsigned long ms )
 {
-    eeprom.flood_unchanged_timeout = ms;
+    eeprom.flood_max_period = ms;
     eepromWrite( eeprom, saveState );
     flood_sensor.setMaxPeriod( ms );
 }
@@ -282,12 +287,12 @@ void floodMaxPeriodSet( unsigned long ms )
 void floodMinPeriodSend()
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_FLOOD+2 ).setType( V_VAR1 ).set( eeprom.flood_max_frequency_timeout ));
+    send( msg.setSensor( CHILD_ID_FLOOD+2 ).setType( V_VAR1 ).set( eeprom.flood_min_period ));
 }
 
 void floodMinPeriodSet( unsigned long ms )
 {
-    eeprom.flood_max_frequency_timeout = ms;
+    eeprom.flood_min_period = ms;
     eepromWrite( eeprom, saveState );
     flood_sensor.setMinPeriod( ms );
 }
@@ -303,74 +308,33 @@ void floodTrippedSet( bool tripped )
     digitalWrite( FLOOD_TRIPPED_LED, tripped ? HIGH:LOW );
 }
 
-#ifdef ALARM_GRACE_DELAY
-/* Set the armed status of the flood detection
-    + send the corresponding state to the controller
-    + reinitialize the tripped status
-      thus also sending the new tripped status
-*/
-void floodSetGraceDelay( unsigned long ms )
-{
-  eeprom.flood_grace_delay = ms;
-  eepromWrite( eeprom );
-  flood_sensor.setGraceDelay( ms );
-  floodSendGraceDelay();
-}
-
-void floodSendGraceDelay()
-{
-  msg.clear();
-  send( msg.setSensor( CHILD_ID_FLOOD + 4 ).setType( V_VAR3 ).set( eeprom.flood_grace_delay ));
-}
-
-void floodSetAdvertPeriod( unsigned long ms )
-{
-  eeprom.flood_advert_period = ms;
-  eepromWrite( eeprom );
-  flood_sensor.setAdvertisingPeriod( ms );
-  floodSendAdvertPeriod();
-}
-
-void floodSendAdvertPeriod()
-{
-  msg.clear();
-  send( msg.setSensor( CHILD_ID_FLOOD + 5 ).setType( V_VAR4 ).set( eeprom.flood_grace_delay ));
-}
-
-void floodSendRemainingDelay()
-{
-  msg.clear();
-  send( msg.setSensor( CHILD_ID_FLOOD + 6 ).setType( V_VAR5 ).set( flood_sensor.getRemainingDelay()));
-}
-#endif
-
 /* ****************************************************************************
    Dealing with analog part of the rain sensor.
 */
 bool rainMeasureCb( void *user_data = NULL );
 void rainSendCb( void *user_data = NULL );
 
-pwiSensor rain_sensor;
+pwiSensor rain_sensor( CHILD_ID_RAIN, RAIN_ANALOGINPUT );
 int       rain_last = 0;
 
 void rainPresentation()
 {
-    rain_sensor.present( CHILD_ID_RAIN, S_RAIN, "Rain sensor" );
-    //                                 1234567890123456789012345
-    present( CHILD_ID_RAIN+1, S_RAIN, "Rain min period" );
-    present( CHILD_ID_RAIN+2, S_RAIN, "Rain max period" );
+    //                                    1234567890123456789012345
+    present( CHILD_ID_RAIN,   S_RAIN, F( "Rain sensor" ));
+    present( CHILD_ID_RAIN+1, S_RAIN, F( "Rain min period" ));
+    present( CHILD_ID_RAIN+2, S_RAIN, F( "Rain max period" ));
 }
 
 void rainSetup()
 {
-    rain_sensor.setup( eeprom.rain_unchanged_timeout, eeprom.rain_max_frequency_timeout, rainMeasureCb, rainSendCb );
-    rain_sensor.trigger();
+    rain_sensor.setup( eeprom.rain_min_period, eeprom.rain_max_period, rainMeasureCb, rainSendCb );
+    rain_sensor.measureAndSend();
 }
 
 bool rainMeasureCb( void *user_data )
 {
     bool changed = false;
-    int cur_rain = analogRead( FLOOD_ANALOGINPUT );
+    int cur_rain = analogRead( RAIN_ANALOGINPUT );
 
     if( cur_rain != rain_last ){
         rain_last = cur_rain;
@@ -387,7 +351,7 @@ void rainSendCb( void *user_data )
 #ifdef DEBUG_ENABLED
     Serial.print( F( "[rainSendCb] rain=" ));
     Serial.print( rain_last );
-    uint8_t range = map( rain_last, FLOOD_ANALOG_MIN, FLOOD_ANALOG_MAX, 0, 3 );
+    uint8_t range = map( rain_last, RAIN_ANALOG_MIN, RAIN_ANALOG_MAX, 0, 3 );
     Serial.print( F( ", mapped=" ));
     Serial.print( range );
     switch ( range ) {
@@ -410,12 +374,12 @@ void rainSendCb( void *user_data )
 void rainMaxPeriodSend()
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_RAIN+2 ).setType( V_VAR1 ).set( eeprom.rain_unchanged_timeout ));
+    send( msg.setSensor( CHILD_ID_RAIN+2 ).setType( V_VAR1 ).set( eeprom.rain_max_period ));
 }
 
 void rainMaxPeriodSet( unsigned long ms )
 {
-    eeprom.rain_unchanged_timeout = ms;
+    eeprom.rain_max_period = ms;
     eepromWrite( eeprom, saveState );
     rain_sensor.setMaxPeriod( ms );
 }
@@ -423,12 +387,12 @@ void rainMaxPeriodSet( unsigned long ms )
 void rainMinPeriodSend()
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_RAIN+1 ).setType( V_VAR1 ).set( eeprom.rain_max_frequency_timeout ));
+    send( msg.setSensor( CHILD_ID_RAIN+1 ).setType( V_VAR1 ).set( eeprom.rain_min_period ));
 }
 
 void rainMinPeriodSet( unsigned long ms )
 {
-    eeprom.rain_max_frequency_timeout = ms;
+    eeprom.rain_min_period = ms;
     eepromWrite( eeprom, saveState );
     rain_sensor.setMinPeriod( ms );
 }
@@ -446,15 +410,15 @@ DHT dht;
 bool tempMeasureCb( void *user_data = NULL );
 void tempSendCb( void *user_data = NULL );
 
-pwiSensor temp_sensor;
+pwiSensor temp_sensor( CHILD_ID_TEMPERATURE, TEMPHUM_DIGITALINPUT );
 int       temp_last = 0;    // store the temperature multiplied by 10
 
 void tempPresentation()
 {
-    temp_sensor.present( CHILD_ID_TEMPERATURE, S_TEMP, "Temperature sensor" );
-    //                                          1234567890123456789012345
-    present( CHILD_ID_TEMPERATURE+1, S_TEMP, "Temperature min period" );
-    present( CHILD_ID_TEMPERATURE+2, S_TEMP, "Temperature max period" );
+    //                                           1234567890123456789012345
+    present( CHILD_ID_TEMPERATURE,   S_TEMP, F( "Temperature sensor" ));
+    present( CHILD_ID_TEMPERATURE+1, S_TEMP, F( "Temperature min period" ));
+    present( CHILD_ID_TEMPERATURE+2, S_TEMP, F( "Temperature max period" ));
 }
 
 /* Read the temperature as a float.
@@ -465,8 +429,8 @@ void tempSetup()
     // temperature/humidity
     dht.setup( TEMPHUM_DIGITALINPUT, DHT::AM2302 );
 
-    temp_sensor.setup( eeprom.temp_unchanged_timeout, eeprom.temp_max_frequency_timeout, tempMeasureCb, tempSendCb );
-    temp_sensor.trigger();
+    temp_sensor.setup( eeprom.temp_min_period, eeprom.temp_max_period, tempMeasureCb, tempSendCb );
+    temp_sensor.measureAndSend();
 }
 
 bool tempMeasureCb( void *user_data )
@@ -503,12 +467,12 @@ void tempSendCb( void *user_data )
 void tempMaxPeriodSend()
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_TEMPERATURE+2 ).setType( V_VAR1 ).set( eeprom.temp_unchanged_timeout ));
+    send( msg.setSensor( CHILD_ID_TEMPERATURE+2 ).setType( V_VAR1 ).set( eeprom.temp_max_period ));
 }
 
 void tempMaxPeriodSet( unsigned long ms )
 {
-    eeprom.temp_unchanged_timeout = ms;
+    eeprom.temp_max_period = ms;
     eepromWrite( eeprom, saveState );
     temp_sensor.setMaxPeriod( ms );
 }
@@ -516,12 +480,12 @@ void tempMaxPeriodSet( unsigned long ms )
 void tempMinPeriodSend()
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_TEMPERATURE+1 ).setType( V_VAR1 ).set( eeprom.temp_max_frequency_timeout ));
+    send( msg.setSensor( CHILD_ID_TEMPERATURE+1 ).setType( V_VAR1 ).set( eeprom.temp_min_period ));
 }
 
 void tempMinPeriodSet( unsigned long ms )
 {
-    eeprom.temp_max_frequency_timeout = ms;
+    eeprom.temp_min_period = ms;
     eepromWrite( eeprom, saveState );
     temp_sensor.setMinPeriod( ms );
 }
@@ -533,21 +497,21 @@ void tempMinPeriodSet( unsigned long ms )
 bool humMeasureCb( void *user_data = NULL );
 void humSendCb( void *user_data = NULL );
 
-pwiSensor hum_sensor;
+pwiSensor hum_sensor( CHILD_ID_HUMIDITY, TEMPHUM_DIGITALINPUT );
 int       hum_last = 0;   // store the measure multiplied by 10
 
 void humPresentation()
 {
-    hum_sensor.present( CHILD_ID_HUMIDITY, S_HUM, "Humidity sensor" );
-    //                                    1234567890123456789012345
-    present( CHILD_ID_HUMIDITY+1, S_HUM, "Humidity min period" );
-    present( CHILD_ID_HUMIDITY+2, S_HUM, "Humidity max period" );
+    //                                       1234567890123456789012345
+    present( CHILD_ID_HUMIDITY,   S_HUM, F( "Humidity sensor" ));
+    present( CHILD_ID_HUMIDITY+1, S_HUM, F( "Humidity min period" ));
+    present( CHILD_ID_HUMIDITY+2, S_HUM, F( "Humidity max period" ));
 }
 
 void humSetup()
 {
-    hum_sensor.setup( eeprom.hum_unchanged_timeout, eeprom.hum_max_frequency_timeout, humMeasureCb, humSendCb );
-    hum_sensor.trigger();
+    hum_sensor.setup( eeprom.hum_min_period, eeprom.hum_max_period, humMeasureCb, humSendCb );
+    hum_sensor.measureAndSend();
 }
 
 bool humMeasureCb( void *user_data )
@@ -584,12 +548,12 @@ void humSendCb( void *user_data )
 void humMaxPeriodSend()
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_HUMIDITY+2 ).setType( V_VAR1 ).set( eeprom.hum_unchanged_timeout ));
+    send( msg.setSensor( CHILD_ID_HUMIDITY+2 ).setType( V_VAR1 ).set( eeprom.hum_max_period ));
 }
 
 void humMaxPeriodSet( unsigned long ms )
 {
-    eeprom.hum_unchanged_timeout = ms;
+    eeprom.hum_max_period = ms;
     eepromWrite( eeprom, saveState );
     hum_sensor.setMaxPeriod( ms );
 }
@@ -597,12 +561,12 @@ void humMaxPeriodSet( unsigned long ms )
 void humMinPeriodSend()
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_HUMIDITY+1 ).setType( V_VAR1 ).set( eeprom.hum_max_frequency_timeout ));
+    send( msg.setSensor( CHILD_ID_HUMIDITY+1 ).setType( V_VAR1 ).set( eeprom.hum_min_period ));
 }
 
 void humMinPeriodSet( unsigned long ms )
 {
-    eeprom.hum_max_frequency_timeout = ms;
+    eeprom.hum_min_period = ms;
     eepromWrite( eeprom, saveState );
     hum_sensor.setMinPeriod( ms );
 }
@@ -616,47 +580,42 @@ void humMinPeriodSet( unsigned long ms )
    - door closed : contact is closed
    - door opened: contact is opened.
 */
-#define OPENING_INPUT           (A0)           // use analog pin as a digital input
-#define OPENING_LED             (A1)
+#define DOOR_OPENING_INPUT      (A0)           // use analog pin as a digital input
+#define DOOR_OPENING_LED        (A1)
 
 bool doorMeasureCb( void *user_data = NULL );
 void doorSendCb( void *user_data = NULL );
 
-pwiSensor door_sensor;
+pwiSensor door_sensor( CHILD_ID_DOOR, DOOR_OPENING_INPUT);
 bool      door_opened = false;
 
 void doorPresentation()
 {
-    door_sensor.present( CHILD_ID_DOOR, S_DOOR, "Door opening detection" );
-    //                                 1234567890123456789012345
-    present( CHILD_ID_DOOR+1, S_DOOR, "Door alarm tripped" );
-    present( CHILD_ID_DOOR+2, S_DOOR, "Door min period" );
-    present( CHILD_ID_DOOR+3, S_DOOR, "Door max period" );
-#ifdef ALARM_GRACE_DELAY
-    present( CHILD_ID_DOOR+4, S_DOOR, "Door grace delay" );
-    present( CHILD_ID_DOOR+5, S_DOOR, "Door advertising period" );
-    present( CHILD_ID_DOOR+6, S_DOOR, "Door remaining grace delay" );
-#endif
+    //                                    1234567890123456789012345
+    present( CHILD_ID_DOOR,   S_DOOR, F( "Door opening detection" ));
+    present( CHILD_ID_DOOR+1, S_DOOR, F( "Door alarm tripped" ));
+    present( CHILD_ID_DOOR+2, S_DOOR, F( "Door min period" ));
+    present( CHILD_ID_DOOR+3, S_DOOR, F( "Door max period" ));
 }
 
 void doorSetup()
 {
-    pinMode( OPENING_INPUT, INPUT );
-    digitalWrite( OPENING_LED, LOW );
-    pinMode( OPENING_LED, OUTPUT );
+    pinMode( DOOR_OPENING_INPUT, INPUT );
+    digitalWrite( DOOR_OPENING_LED, LOW );
+    pinMode( DOOR_OPENING_LED, OUTPUT );
 
-    door_sensor.setup( eeprom.door_unchanged_timeout, eeprom.door_max_frequency_timeout, doorMeasureCb, doorSendCb );
-    door_sensor.trigger();
+    door_sensor.setup( eeprom.door_min_period, eeprom.door_max_period, doorMeasureCb, doorSendCb );
+    door_sensor.measureAndSend();
 }
 
 bool doorMeasureCb( void *user_data )
 {
     bool changed = false;
-    bool cur_opened = ( digitalRead( OPENING_INPUT ) == HIGH );
+    bool cur_opened = ( digitalRead( DOOR_OPENING_INPUT ) == HIGH );
 
     if ( cur_opened != door_opened ) {
       door_opened = cur_opened;
-      digitalWrite( OPENING_LED, door_opened ? HIGH : LOW );
+      digitalWrite( DOOR_OPENING_LED, door_opened ? HIGH : LOW );
       changed = true;
     }
 
@@ -680,12 +639,12 @@ void doorSendCb( void *user_data )
 void doorMaxPeriodSend()
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_DOOR+3 ).setType( V_VAR1 ).set( eeprom.door_unchanged_timeout ));
+    send( msg.setSensor( CHILD_ID_DOOR+3 ).setType( V_VAR1 ).set( eeprom.door_max_period ));
 }
 
 void doorMaxPeriodSet( unsigned long ms )
 {
-    eeprom.door_unchanged_timeout = ms;
+    eeprom.door_max_period = ms;
     eepromWrite( eeprom, saveState );
     door_sensor.setMaxPeriod( ms );
 }
@@ -693,58 +652,15 @@ void doorMaxPeriodSet( unsigned long ms )
 void doorMinPeriodSend()
 {
     msg.clear();
-    send( msg.setSensor( CHILD_ID_DOOR+2 ).setType( V_VAR1 ).set( eeprom.door_max_frequency_timeout ));
+    send( msg.setSensor( CHILD_ID_DOOR+2 ).setType( V_VAR1 ).set( eeprom.door_min_period ));
 }
 
 void doorMinPeriodSet( unsigned long ms )
 {
-    eeprom.door_max_frequency_timeout = ms;
+    eeprom.door_min_period = ms;
     eepromWrite( eeprom, saveState );
     door_sensor.setMinPeriod( ms );
 }
-
-#ifdef ALARM_GRACE_DELAY
-void doorSetArmed( bool armed )
-{
-  eeprom.door_armed = armed;
-  eepromWrite( eeprom );
-  door_sensor.setArmed( armed );
-}
-
-void doorSetGraceDelay( unsigned long ms )
-{
-  eeprom.door_grace_delay = ms;
-  eepromWrite( eeprom );
-  door_sensor.setGraceDelay( ms );
-  doorSendGraceDelay();
-}
-
-void doorSendGraceDelay()
-{
-  msg.clear();
-  send( msg.setSensor( CHILD_ID_DOOR + 4 ).setType( V_VAR3 ).set( eeprom.door_grace_delay ));
-}
-
-void doorSetAdvertPeriod( unsigned long ms )
-{
-  eeprom.door_advert_period = ms;
-  eepromWrite( eeprom );
-  door_sensor.setAdvertisingPeriod( ms );
-  doorSendAdvertPeriod();
-}
-
-void doorSendAdvertPeriod()
-{
-  msg.clear();
-  send( msg.setSensor( CHILD_ID_DOOR + 5 ).setType( V_VAR4 ).set( eeprom.door_advert_period ));
-}
-
-void doorSendRemainingDelay()
-{
-  msg.clear();
-  send( msg.setSensor( CHILD_ID_DOOR + 6 ).setType( V_VAR5 ).set( door_sensor.getRemainingDelay()));
-}
-#endif
 
 /* **************************************************************************************
  *  mainSensor
@@ -754,7 +670,7 @@ void mainAutoDumpCb( void*empty );
 
 void mainPresentation()
 {
-    present( CHILD_MAIN+1, S_CUSTOM, "Data periodic dump" );
+    present( CHILD_MAIN+1, S_CUSTOM, F( "Config dump" ));
 }
 
 void mainSetup()
@@ -957,11 +873,6 @@ void dumpData( void )
     floodSendCb();
     floodMinPeriodSend();
     floodMaxPeriodSend();
-#ifdef ALARM_GRACE_DELAY
-    floodSendGraceDelay();
-    floodSendAdvertPeriod();
-    floodSendRemainingDelay();
-#endif
   
     rainSendCb();
     rainMinPeriodSend();
@@ -978,10 +889,5 @@ void dumpData( void )
     doorSendCb();
     doorMinPeriodSend();
     doorMaxPeriodSend();
-#ifdef ALARM_GRACE_DELAY
-    doorSendGraceDelay();
-    doorSendAdvertPeriod();
-    doorSendRemainingDelay();
-#endif
 }
 
