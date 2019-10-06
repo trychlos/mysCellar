@@ -129,15 +129,21 @@
                     update to pwiPrivate 190902
                     update to pwiCommon 190903
                     no more use any signing code
-   ketch uses 25904 bytes (84%) of program storage space. Maximum is 30720 bytes.
+   Sketch uses 25904 bytes (84%) of program storage space. Maximum is 30720 bytes.
 Global variables use 892 bytes (43%) of dynamic memory, leaving 1156 bytes for local variables. Maximum is 2048 bytes.
+
+ * pwi 2019-10- 6 v7.7-2019
+ *                  fix flood messages at setup
+ *                  fix receiving code
+ * Sketch uses 25962 bytes (84%) of program storage space. Maximum is 30720 bytes.
+Global variables use 874 bytes (42%) of dynamic memory, leaving 1174 bytes for local variables. Maximum is 2048 bytes.
 */
 
 // uncomment for debugging this sketch
-#define DEBUG_ENABLED
+#define SKETCH_DEBUG
 
-static char const thisSketchName[] PROGMEM    = "mysCellar";
-static char const thisSketchVersion[] PROGMEM = "7.6-2019";
+static char const sketchName[] PROGMEM    = "mysCellar";
+static char const sketchVersion[] PROGMEM = "7.7-2019";
 
 /* The MySensors part */
 #define MY_NODE_ID 4
@@ -145,6 +151,8 @@ static char const thisSketchVersion[] PROGMEM = "7.6-2019";
 #define MY_REPEATER_FEATURE
 #define MY_RADIO_NRF24
 #define MY_RF24_PA_LEVEL RF24_PA_HIGH
+//#define MY_SIGNING_SOFT
+//#define MY_SIGNING_SOFT_RANDOMSEED_PIN 7
 //#include <pwi_myhmac.h>
 #include <pwi_myrf24.h>
 #include <MySensors.h>
@@ -168,6 +176,7 @@ MyMessage msg;
 /*
  * Declare our classes
  */
+#include <pwiCommon.h>
 #include <pwiSensor.h>
 #include <pwiTimer.h>
 #include "eeprom.h"
@@ -217,7 +226,7 @@ void floodSetup()
 
     flood_sensor.setup( eeprom.flood_min_period, eeprom.flood_max_period, floodMeasureCb, floodSendCb );
     floodArmedSet( eeprom.flood_armed );
-    flood_sensor.measureAndSend();
+    flood_sensor.measureAndSend( true );
 }
 
 /* Regarding the flood detection, we are only interested by the digital value
@@ -328,7 +337,7 @@ void rainPresentation()
 void rainSetup()
 {
     rain_sensor.setup( eeprom.rain_min_period, eeprom.rain_max_period, rainMeasureCb, rainSendCb );
-    rain_sensor.measureAndSend();
+    rain_sensor.measureAndSend( true );
 }
 
 bool rainMeasureCb( void *user_data )
@@ -348,7 +357,7 @@ void rainSendCb( void *user_data )
 {
     msg.clear();
     send( msg.setSensor( CHILD_ID_RAIN ).setType( V_RAIN ).set( rain_last ));
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
     Serial.print( F( "[rainSendCb] rain=" ));
     Serial.print( rain_last );
     uint8_t range = map( rain_last, RAIN_ANALOG_MIN, RAIN_ANALOG_MAX, 0, 3 );
@@ -430,7 +439,7 @@ void tempSetup()
     dht.setup( TEMPHUM_DIGITALINPUT, DHT::AM2302 );
 
     temp_sensor.setup( eeprom.temp_min_period, eeprom.temp_max_period, tempMeasureCb, tempSendCb );
-    temp_sensor.measureAndSend();
+    temp_sensor.measureAndSend( true );
 }
 
 bool tempMeasureCb( void *user_data )
@@ -457,7 +466,7 @@ void tempSendCb( void *user_data )
     float ftemp = temp_last / 10.0;
     msg.clear();
     send( msg.setSensor( CHILD_ID_TEMPERATURE ).setType( V_TEMP ).set( ftemp, 1 ));
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
     Serial.print( F( "[tempSendCb] temp=" ));
     Serial.print( ftemp, 1 );
     Serial.println( F( "°C" ));
@@ -511,7 +520,7 @@ void humPresentation()
 void humSetup()
 {
     hum_sensor.setup( eeprom.hum_min_period, eeprom.hum_max_period, humMeasureCb, humSendCb );
-    hum_sensor.measureAndSend();
+    hum_sensor.measureAndSend( true );
 }
 
 bool humMeasureCb( void *user_data )
@@ -538,7 +547,7 @@ void humSendCb( void *user_data )
     float fhum = hum_last / 10.0 ;
     msg.clear();
     send( msg.setSensor( CHILD_ID_HUMIDITY ).setType( V_HUM ).set( fhum, 1 ));
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
     Serial.print( F( "[humSendCb] humidity=" ));
     Serial.print( fhum, 1 );
     Serial.println( F( "%" ));
@@ -605,7 +614,7 @@ void doorSetup()
     pinMode( DOOR_OPENING_LED, OUTPUT );
 
     door_sensor.setup( eeprom.door_min_period, eeprom.door_max_period, doorMeasureCb, doorSendCb );
-    door_sensor.measureAndSend();
+    door_sensor.measureAndSend( true );
 }
 
 bool doorMeasureCb( void *user_data )
@@ -628,7 +637,7 @@ void doorSendCb( void *user_data )
     send( msg.setSensor( CHILD_ID_DOOR ).setType( V_ARMED ).set( eeprom.door_armed ));
     msg.clear();
     send( msg.setSensor( CHILD_ID_DOOR+1 ).setType( V_TRIPPED ).set( door_opened ));
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
     Serial.print( F( "[doorSendCb] armed=" ));
     Serial.print( eeprom.door_armed ? "True":"False" );
     Serial.print( F( ", opened=" ));
@@ -689,7 +698,7 @@ void mainAutoDumpSend()
     uint8_t sensor_id = CHILD_MAIN+1;
     uint8_t msg_type = V_VAR1;
     unsigned long payload = eeprom.auto_dump_timeout;
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
     Serial.print( F( "[mainAutoDumpSend] sensor=" ));
     Serial.print( sensor_id );
     Serial.print( F( ", type=" ));
@@ -703,7 +712,7 @@ void mainAutoDumpSend()
 
 void mainAutoDumpSet( unsigned long ms )
 {
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
     Serial.print( F( "[mainAutoDumpSet] ms=" ));
     Serial.println( ms );
 #endif
@@ -718,7 +727,7 @@ void mainAutoDumpSet( unsigned long ms )
 // As of MySensors v2.x, presentation() is called before setup().
 void presentation()
 {
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
     Serial.println( F( "presentation()" ));
 #endif
     mainPresentation();
@@ -731,13 +740,13 @@ void presentation()
 
 void setup()
 {
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
     Serial.begin( 115200 );
     Serial.println( F( "setup()" ));
 #endif
 
     // sketch presentation
-    sendSketchInfo( thisSketchName, thisSketchVersion );
+    sendSketchInfo( PGMSTR( sketchName ), PGMSTR( sketchVersion ));
 
     // library version
     msg.clear();
@@ -759,6 +768,7 @@ void setup()
 void loop()
 {
     pwiTimer::Loop();
+    wait( 1000 );
 }
 
 void receive(const MyMessage &message)
@@ -769,7 +779,7 @@ void receive(const MyMessage &message)
     memset( payload, '\0', sizeof( payload ));
     message.getString( payload );
 
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
     Serial.print( F( "[receive] sensor=" ));
     Serial.print( message.sensor );
     Serial.print( F( ", type=" ));
@@ -783,7 +793,7 @@ void receive(const MyMessage &message)
 
     // all received messages should be V_CUSTOM
     if( message.type != V_CUSTOM ){
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
         Serial.println( F( "[receive] message cancelled as should be V_CUSTOM" ));
 #endif
         return;
@@ -791,7 +801,7 @@ void receive(const MyMessage &message)
 
     if( cmd == C_REQ ){
           uint8_t ureq = strlen( payload ) > 0 ? atoi( payload ) : 0;
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
           Serial.print( F( "[receive] C_REQ: ureq=" ));
           Serial.println( ureq );
 #endif
@@ -810,7 +820,7 @@ void receive(const MyMessage &message)
 
     } else if( cmd == C_SET ){
         unsigned long ulong = strlen( payload ) > 0 ? atol( payload ) : 0;
-#ifdef DEBUG_ENABLED
+#ifdef SKETCH_DEBUG
         Serial.print( F( "[receive] C_SET: ulong=" ));
         Serial.println( ulong );
 #endif
