@@ -1,6 +1,6 @@
 /*
    MysCellar
-   Copyright (C) 2015,2016,2017 Pierre Wieser <pwieser@trychlos.org>
+   Copyright (C) 2015-2019 Pierre Wieser <pwieser@trychlos.org>
 
    Description:
    Manages in one MySensors-compatible board following modules
@@ -43,48 +43,7 @@
    ---------------------
     - Input, aka actions, aka messages received by this node from the gateway
     - Output, aka informations, aka messages sent by this node to the gateway
-
       cf. original, source and reference in build/Sheets.ods
-
-      Sens  Name                  Id  Type          Nature  Command Message  Payload     Comment
-
-      In  CHILD_MAIN               1  S_CUSTOM      Action  C_REQ  V_CUSTOM  1           reset EEPROM to default values
-      In  CHILD_MAIN               1  S_CUSTOM      Action  C_REQ  V_CUSTOM  2           dump data
-      In  CHILD_MAIN+1             2  S_CUSTOM      Action  C_SET  V_CUSTOM  <ms>        set periodic resend of the full data ; 0 to disable ; default=86400000 (24h)
-      Out CHILD_MAIN+1             2  S_CUSTOM      Info           V_VAR1    <ms>        periodic resend period of the full data
-
-      In  CHILD_ID_FLOOD          10  S_WATER_LEAK  Action  C_SET  V_CUSTOM  ARM=1|0     arm/unarm the sensor
-      Out CHILD_ID_FLOOD          10  S_WATER_LEAK  Info           V_ARMED   true|false  whether the flood alarm is armed
-      Out CHILD_ID_FLOOD+1        11  S_WATER_LEAK  Info           V_TRIPPED true|false  whether the flood alarm is tripped (false if not armed)
-      In  CHILD_ID_FLOOD+2        12  S_WATER_LEAK  Action  C_SET  V_CUSTOM  <ms>        set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      Out CHILD_ID_FLOOD+2        12  S_WATER_LEAK  Info           V_VAR1    <ms>        current max send frequency for the flood alarm
-      In  CHILD_ID_FLOOD+3        13  S_WATER_LEAK  Action  C_SET  V_CUSTOM  <ms>        set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
-      Out CHILD_ID_FLOOD+3        13  S_WATER_LEAK  Info           V_VAR1    <ms>        current unchanged send timeout for the flood alarm
-
-      Out CHILD_ID_RAIN           20  S_RAIN        Info           V_RAIN    <num>       rain analogic value in [0..1024]
-      In  CHILD_ID_RAIN+1         21  S_RAIN        Action  C_SET  V_CUSTOM  <ms>        set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      Out CHILD_ID_RAIN+1         21  S_RAIN        Info           V_VAR1    <ms>        current max send frequency for rain
-      In  CHILD_ID_RAIN+2         22  S_RAIN        Action  C_SET  V_CUSTOM  <ms>        set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
-      Out CHILD_ID_RAIN+2         22  S_RAIN        Info           V_VAR1    <ms>        current unchanged send timeout for rain
-
-      Out CHILD_ID_TEMPERATURE    30  S_TEMP        Info           V_TEMP    <num>       temperature
-      In  CHILD_ID_TEMPERATURE+1  31  S_TEMP        Action  C_SET  V_CUSTOM  <ms>        set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      Out CHILD_ID_TEMPERATURE+1  31  S_TEMP        Info           V_VAR1    <ms>        current max send frequency for temperature
-      In  CHILD_ID_TEMPERATURE+2  32  S_TEMP        Action  C_SET  V_CUSTOM  <ms>        set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
-      Out CHILD_ID_TEMPERATURE+2  32  S_TEMP        Info           V_VAR1    <ms>        current unchanged send timeout for temperature
-
-      Out CHILD_ID_HUMIDITY       40  S_HUM         Info           V_HUM     <num>       humidity
-      In  CHILD_ID_HUMIDITY+1     41  S_HUM         Action  C_SET  V_CUSTOM  <ms>        set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      Out CHILD_ID_HUMIDITY+1     41  S_HUM         Info           V_VAR1    <ms>        current max send frequency for humidity
-      In  CHILD_ID_HUMIDITY+2     42  S_HUM         Action  C_SET  V_CUSTOM  <ms>        set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
-      Out CHILD_ID_HUMIDITY+2     42  S_HUM         Info           V_VAR1    <ms>        current unchanged send timeout for humidity
-
-      Out CHILD_ID_DOOR           50  S_DOOR        Info           V_ARMED   true|false  whether the door opening detection is armed (always TRUE for now)
-      Out CHILD_ID_DOOR+1         51  S_DOOR        Info           V_TRIPPED true|false  whether the door is opened (false if not armed)
-      In  CHILD_ID_DOOR+2         52  S_DOOR        Action  C_SET  V_CUSTOM  <ms>        set max send frequency ; def_max_frequency_timeout = 120000 (2mn) ; 0 for stop
-      Out CHILD_ID_DOOR+2         52  S_DOOR        Info           V_VAR1    <ms>        current max send frequency for door opening detection
-      In  CHILD_ID_DOOR+3         53  S_DOOR        Action  C_SET  V_CUSTOM  <ms>        set unchanged send timeout ; def_unchanged_timeout = 3600000 (1h)
-      Out CHILD_ID_DOOR+3         53  S_DOOR        Info           V_VAR1    <ms>        current unchanged send timeout for door opening detection
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -131,19 +90,24 @@
                     no more use any signing code
    Sketch uses 25904 bytes (84%) of program storage space. Maximum is 30720 bytes.
 Global variables use 892 bytes (43%) of dynamic memory, leaving 1156 bytes for local variables. Maximum is 2048 bytes.
-
+ *
  * pwi 2019-10- 6 v7.7-2019
  *                  fix flood messages at setup
  *                  fix receiving code
  * Sketch uses 25962 bytes (84%) of program storage space. Maximum is 30720 bytes.
 Global variables use 874 bytes (42%) of dynamic memory, leaving 1174 bytes for local variables. Maximum is 2048 bytes.
+ *
+ * pwi 2019-10- 6 v7.8-2019
+ *                  send back the status when enabling/disabling flood detection (todo #11)
+ * Sketch uses 26286 bytes (85%) of program storage space. Maximum is 30720 bytes.
+Global variables use 893 bytes (43%) of dynamic memory, leaving 1155 bytes for local variables. Maximum is 2048 bytes.
 */
 
 // uncomment for debugging this sketch
 #define SKETCH_DEBUG
 
 static char const sketchName[] PROGMEM    = "mysCellar";
-static char const sketchVersion[] PROGMEM = "7.7-2019";
+static char const sketchVersion[] PROGMEM = "7.8-2019";
 
 /* The MySensors part */
 #define MY_NODE_ID 4
@@ -831,6 +795,7 @@ void receive(const MyMessage &message)
                 break;
             case CHILD_ID_FLOOD:
                 floodArmedSet( payload );
+                floodSendCb( NULL );
                 break;
             case CHILD_ID_FLOOD+2:
                 floodMinPeriodSet( ulong );
