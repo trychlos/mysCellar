@@ -10,7 +10,7 @@
  Todo
  ====
 
-  10
+  11
 
 -----------------------------------------------------------------------
  Done
@@ -50,6 +50,10 @@
 
    9 2019- 5-20 periodically re-send the full configuration
      2019- 5-25 done in v7.3-2019
+
+  10 2019-10-22 enabling/disabling flood alarm does not send back the
+                alarm status
+     2019-10-24 fixed in 7.8-2019
 
 -----------------------------------------------------------------------
  P. Wieser - Created on 2017, apr. 2nd
